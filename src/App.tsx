@@ -1,40 +1,66 @@
-import { useState } from 'react'
+import {
+  useState,
+} from 'react'
 
 import './App.css'
 
-import { CadCanvas } from './components/CadCanvas'
+import {
+  CadCanvas,
+} from './components/CadCanvas'
 
 import {
   addLine,
   addPoint,
   createEmptyDocument,
+  type PatternDocument,
 } from './cad/document'
 
-import type { DisplayUnit } from './cad/display'
+import type {
+  DisplayUnit,
+} from './cad/display'
+
+import {
+  canRedo,
+  canUndo,
+  commitHistory,
+  createHistory,
+  redoHistory,
+  undoHistory,
+} from './cad/history'
 
 function createDemoPattern() {
-  let document = createEmptyDocument()
+  let document =
+    createEmptyDocument()
 
-  document = addPoint(document, {
-    id: 'A',
-    name: 'A',
-    xMm: 0,
-    yMm: 0,
-  })
+  document = addPoint(
+    document,
+    {
+      id: 'A',
+      name: 'A',
+      xMm: 0,
+      yMm: 0,
+    },
+  )
 
-  document = addPoint(document, {
-    id: 'B',
-    name: 'B',
-    xMm: 100,
-    yMm: 0,
-  })
+  document = addPoint(
+    document,
+    {
+      id: 'B',
+      name: 'B',
+      xMm: 100,
+      yMm: 0,
+    },
+  )
 
-  document = addLine(document, {
-    id: 'AB',
-    name: 'AB',
-    startPointId: 'A',
-    endPointId: 'B',
-  })
+  document = addLine(
+    document,
+    {
+      id: 'AB',
+      name: 'AB',
+      startPointId: 'A',
+      endPointId: 'B',
+    },
+  )
 
   return document
 }
@@ -43,12 +69,51 @@ function App() {
   const [
     displayUnit,
     setDisplayUnit,
-  ] = useState<DisplayUnit>('cm')
+  ] = useState<DisplayUnit>(
+    'cm',
+  )
 
   const [
-    patternDocument,
-    setPatternDocument,
-  ] = useState(createDemoPattern)
+    patternHistory,
+    setPatternHistory,
+  ] = useState(() =>
+    createHistory(
+      createDemoPattern(),
+    ),
+  )
+
+  const patternDocument =
+    patternHistory.present
+
+  const handleDocumentChange = (
+    nextDocument: PatternDocument,
+  ) => {
+    setPatternHistory(
+      (currentHistory) =>
+        commitHistory(
+          currentHistory,
+          nextDocument,
+        ),
+    )
+  }
+
+  const handleUndo = () => {
+    setPatternHistory(
+      (currentHistory) =>
+        undoHistory(
+          currentHistory,
+        ),
+    )
+  }
+
+  const handleRedo = () => {
+    setPatternHistory(
+      (currentHistory) =>
+        redoHistory(
+          currentHistory,
+        ),
+    )
+  }
 
   return (
     <div className="app">
@@ -68,7 +133,8 @@ function App() {
             value={displayUnit}
             onChange={(event) => {
               setDisplayUnit(
-                event.target.value as DisplayUnit,
+                event.target
+                  .value as DisplayUnit,
               )
             }}
           >
@@ -85,10 +151,30 @@ function App() {
 
       <main className="workspace">
         <CadCanvas
-          document={patternDocument}
-          unit={displayUnit}
+          document={
+            patternDocument
+          }
+          unit={
+            displayUnit
+          }
           onDocumentChange={
-            setPatternDocument
+            handleDocumentChange
+          }
+          canUndo={
+            canUndo(
+              patternHistory,
+            )
+          }
+          canRedo={
+            canRedo(
+              patternHistory,
+            )
+          }
+          onUndo={
+            handleUndo
+          }
+          onRedo={
+            handleRedo
           }
         />
       </main>

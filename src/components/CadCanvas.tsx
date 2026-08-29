@@ -61,6 +61,12 @@ interface CadCanvasProps {
   onDocumentChange: (
     document: PatternDocument,
   ) => void
+
+  canUndo: boolean
+  canRedo: boolean
+
+  onUndo: () => void
+  onRedo: () => void
 }
 
 interface CanvasSize {
@@ -85,6 +91,10 @@ export function CadCanvas({
   document,
   unit,
   onDocumentChange,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
 }: CadCanvasProps) {
   const svgRef =
     useRef<SVGSVGElement | null>(null)
@@ -188,6 +198,35 @@ export function CadCanvas({
     }
   }, [])
 
+  useEffect(() => {
+    if (
+      selection === null
+    ) {
+      return
+    }
+
+    const stillExists =
+      selection.kind ===
+      'point'
+        ? Boolean(
+            document.points[
+              selection.id
+            ],
+          )
+        : Boolean(
+            document.lines[
+              selection.id
+            ],
+          )
+
+    if (!stillExists) {
+      setSelection(null)
+    }
+  }, [
+    document,
+    selection,
+  ])
+
   const gridSpacingMm =
     getGridSpacingMm(unit)
 
@@ -289,7 +328,8 @@ export function CadCanvas({
   }
 
   const handleMouseMove = (
-    event: MouseEvent<SVGSVGElement>,
+    event:
+      MouseEvent<SVGSVGElement>,
   ) => {
     if (isPanning) {
       return
@@ -314,10 +354,12 @@ export function CadCanvas({
   }
 
   const handleCanvasClick = (
-    event: MouseEvent<SVGSVGElement>,
+    event:
+      MouseEvent<SVGSVGElement>,
   ) => {
     if (
-      activeTool !== 'select'
+      activeTool !==
+      'select'
     ) {
       return
     }
@@ -348,20 +390,18 @@ export function CadCanvas({
       return
     }
 
-    const foundSelection =
+    setSelection(
       findSelectionAtScreenPoint(
         document,
         viewport,
         screenPosition,
-      )
-
-    setSelection(
-      foundSelection,
+      ),
     )
   }
 
   const handleWheel = (
-    event: WheelEvent<SVGSVGElement>,
+    event:
+      WheelEvent<SVGSVGElement>,
   ) => {
     event.preventDefault()
 
@@ -394,13 +434,15 @@ export function CadCanvas({
   }
 
   const handlePointerDown = (
-    event: PointerEvent<SVGSVGElement>,
+    event:
+      PointerEvent<SVGSVGElement>,
   ) => {
     const useMiddleMouse =
       event.button === 1
 
     const usePanTool =
-      activeTool === 'pan' &&
+      activeTool ===
+        'pan' &&
       event.button === 0
 
     if (
@@ -442,7 +484,8 @@ export function CadCanvas({
   }
 
   const handlePointerMove = (
-    event: PointerEvent<SVGSVGElement>,
+    event:
+      PointerEvent<SVGSVGElement>,
   ) => {
     const drag =
       panDragRef.current
@@ -497,7 +540,8 @@ export function CadCanvas({
   }
 
   const finishPan = (
-    event: PointerEvent<SVGSVGElement>,
+    event:
+      PointerEvent<SVGSVGElement>,
   ) => {
     const drag =
       panDragRef.current
@@ -560,30 +604,33 @@ export function CadCanvas({
     )
   }
 
-  const applyZoomInput = () => {
-    const value =
-      Number(zoomInput)
+  const applyZoomInput =
+    () => {
+      const value =
+        Number(zoomInput)
 
-    if (
-      zoomInput.trim() === '' ||
-      !Number.isFinite(value)
-    ) {
-      setZoomInput(
-        String(zoomPercent),
-      )
+      if (
+        zoomInput.trim() ===
+          '' ||
+        !Number.isFinite(value)
+      ) {
+        setZoomInput(
+          String(zoomPercent),
+        )
 
-      return
+        return
+      }
+
+      setZoomPercent(value)
     }
-
-    setZoomPercent(value)
-  }
 
   const handleZoomKeyDown = (
     event:
       KeyboardEvent<HTMLInputElement>,
   ) => {
     if (
-      event.key === 'Enter'
+      event.key ===
+      'Enter'
     ) {
       applyZoomInput()
 
@@ -592,7 +639,8 @@ export function CadCanvas({
     }
 
     if (
-      event.key === 'Escape'
+      event.key ===
+      'Escape'
     ) {
       setZoomInput(
         String(zoomPercent),
@@ -623,6 +671,16 @@ export function CadCanvas({
 
       setSelection(null)
     }
+
+  const handleUndo = () => {
+    onUndo()
+    setSelection(null)
+  }
+
+  const handleRedo = () => {
+    onRedo()
+    setSelection(null)
+  }
 
   const canvasCursor =
     isPanning
@@ -857,12 +915,8 @@ export function CadCanvas({
             <g key={point.id}>
               {isSelected && (
                 <circle
-                  cx={
-                    screen.xPx
-                  }
-                  cy={
-                    screen.yPx
-                  }
+                  cx={screen.xPx}
+                  cy={screen.yPx}
                   r={9}
                   fill="none"
                   stroke="#2563eb"
@@ -871,12 +925,8 @@ export function CadCanvas({
               )}
 
               <circle
-                cx={
-                  screen.xPx
-                }
-                cy={
-                  screen.yPx
-                }
+                cx={screen.xPx}
+                cy={screen.yPx}
                 r={5}
                 fill={
                   isSelected
@@ -902,7 +952,7 @@ export function CadCanvas({
           )
         })}
 
-        {/* TOP RULER BACKGROUND */}
+        {/* TOP RULER */}
 
         <rect
           x={0}
@@ -917,7 +967,7 @@ export function CadCanvas({
           stroke="#cccccc"
         />
 
-        {/* LEFT RULER BACKGROUND */}
+        {/* LEFT RULER */}
 
         <rect
           x={0}
@@ -932,7 +982,7 @@ export function CadCanvas({
           stroke="#cccccc"
         />
 
-        {/* HORIZONTAL RULER */}
+        {/* HORIZONTAL RULER TICKS */}
 
         <g>
           {horizontalRulerTicks.map(
@@ -1000,7 +1050,7 @@ export function CadCanvas({
           )}
         </g>
 
-        {/* VERTICAL RULER */}
+        {/* VERTICAL RULER TICKS */}
 
         <g>
           {verticalRulerTicks.map(
@@ -1104,7 +1154,7 @@ export function CadCanvas({
           minHeight: '32px',
           display: 'flex',
           alignItems: 'center',
-          gap: '14px',
+          gap: '10px',
           padding: '3px 12px',
           background:
             'rgba(245,245,245,0.97)',
@@ -1147,9 +1197,39 @@ export function CadCanvas({
             marginLeft: 'auto',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '6px',
           }}
         >
+          <button
+            type="button"
+            disabled={!canUndo}
+            onClick={
+              handleUndo
+            }
+            title={
+              canUndo
+                ? 'Undo last edit'
+                : 'Nothing to undo'
+            }
+          >
+            Undo
+          </button>
+
+          <button
+            type="button"
+            disabled={!canRedo}
+            onClick={
+              handleRedo
+            }
+            title={
+              canRedo
+                ? 'Redo last edit'
+                : 'Nothing to redo'
+            }
+          >
+            Redo
+          </button>
+
           <button
             type="button"
             aria-pressed={
@@ -1227,95 +1307,77 @@ export function CadCanvas({
                 ? 'Select an object first'
                 : `Delete ${selectedDescription}`
             }
-            style={{
-              padding:
-                '2px 8px',
-            }}
           >
             Delete
           </button>
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
+          <span>
+            Zoom:
+          </span>
+
+          <button
+            type="button"
+            onClick={() => {
+              setZoomPercent(
+                zoomPercent -
+                  10,
+              )
             }}
           >
-            <span>
-              Zoom:
-            </span>
+            −
+          </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setZoomPercent(
-                  zoomPercent -
-                    10,
-                )
-              }}
-              title="Zoom out"
-            >
-              −
-            </button>
+          <input
+            type="number"
+            min="10"
+            max="1000"
+            step="10"
+            value={zoomInput}
+            onChange={(
+              event,
+            ) => {
+              setZoomInput(
+                event.target.value,
+              )
+            }}
+            onBlur={
+              applyZoomInput
+            }
+            onKeyDown={
+              handleZoomKeyDown
+            }
+            aria-label="Zoom percentage"
+            style={{
+              width: '65px',
+              textAlign: 'right',
+              padding: '2px 4px',
+            }}
+          />
 
-            <input
-              type="number"
-              min="10"
-              max="1000"
-              step="10"
-              value={zoomInput}
-              onChange={(
-                event,
-              ) => {
-                setZoomInput(
-                  event.target
-                    .value,
-                )
-              }}
-              onBlur={
-                applyZoomInput
-              }
-              onKeyDown={
-                handleZoomKeyDown
-              }
-              aria-label="Zoom percentage"
-              style={{
-                width: '65px',
-                textAlign:
-                  'right',
-                padding:
-                  '2px 4px',
-              }}
-            />
+          <span>%</span>
 
-            <span>%</span>
+          <button
+            type="button"
+            onClick={() => {
+              setZoomPercent(
+                zoomPercent +
+                  10,
+              )
+            }}
+          >
+            +
+          </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setZoomPercent(
-                  zoomPercent +
-                    10,
-                )
-              }}
-              title="Zoom in"
-            >
-              +
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setZoomPercent(
-                  100,
-                )
-              }}
-              title="Reset zoom to 100%"
-            >
-              100%
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setZoomPercent(
+                100,
+              )
+            }}
+          >
+            100%
+          </button>
         </div>
       </div>
     </div>
