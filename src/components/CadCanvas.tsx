@@ -14,6 +14,7 @@ import type { PatternDocument } from '../cad/document'
 import {
   formatLength,
   getGridSpacingMm,
+  getSnapSpacingMm,
   type DisplayUnit,
 } from '../cad/display'
 
@@ -25,6 +26,10 @@ import {
   getGridPositionsMm,
   getVisibleWorldBounds,
 } from '../cad/grid'
+
+import {
+  movePointToWorldPosition,
+} from '../cad/movement'
 
 import {
   panViewportByScreenDelta,
@@ -84,6 +89,11 @@ interface PanDragState {
   yPx: number
 }
 
+interface PointDragState {
+  pointerId: number
+  pointId: string
+}
+
 type ActiveTool =
   | 'select'
   | 'pan'
@@ -124,6 +134,15 @@ export function CadCanvas({
   const panDragRef =
     useRef<PanDragState | null>(null)
 
+  const pointDragRef =
+    useRef<PointDragState | null>(null)
+
+  const dragPreviewRef =
+    useRef<PatternDocument | null>(null)
+
+  const suppressNextClickRef =
+    useRef(false)
+
   const [
     canvasSize,
     setCanvasSize,
@@ -159,6 +178,18 @@ export function CadCanvas({
   ] = useState(false)
 
   const [
+    isDraggingPoint,
+    setIsDraggingPoint,
+  ] = useState(false)
+
+  const [
+    dragPreviewDocument,
+    setDragPreviewDocument,
+  ] = useState<PatternDocument | null>(
+    null,
+  )
+
+  const [
     viewport,
     setViewport,
   ] = useState(() =>
@@ -168,6 +199,17 @@ export function CadCanvas({
       120,
     ),
   )
+
+  /*
+   * During a point drag we render the
+   * local preview document.
+   *
+   * Nothing is written to history until
+   * the mouse button is released.
+   */
+  const displayDocument =
+    dragPreviewDocument ??
+    document
 
   const zoomPercent =
     Math.round(
@@ -248,6 +290,9 @@ export function CadCanvas({
 
   const gridSpacingMm =
     getGridSpacingMm(unit)
+
+  const snapSpacingMm =
+    getSnapSpacingMm(unit)
 
   const effectivePxPerMm =
     viewport.pxPerMm *
@@ -346,10 +391,26 @@ export function CadCanvas({
     }
   }
 
-  const handleMouseMove = (
-    event: MouseEvent<SVGSVGElement>,
+  const isInsideRulerArea = (
+    xPx: number,
+    yPx: number,
   ) => {
-    if (isPanning) {
+    return (
+      xPx <
+        RULER_SIZE_PX ||
+      yPx <
+        RULER_SIZE_PX
+    )
+  }
+
+  const handleMouseMove = (
+    event:
+      MouseEvent<SVGSVGElement>,
+  ) => {
+    if (
+      isPanning ||
+      isDraggingPoint
+    ) {
       return
     }
 
@@ -372,15 +433,35 @@ export function CadCanvas({
   }
 
   const handleCanvasClick = (
-    event: MouseEvent<SVGSVGElement>,
+    event:
+      MouseEvent<SVGSVGElement>,
   ) => {
+    /*
+     * A drag normally creates a click
+     * event after pointer-up.
+     *
+     * Ignore that one click so the
+     * newly moved point does not lose
+     * its selection.
+     */
+    if (
+      suppressNextClickRef.current
+    ) {
+      suppressNextClickRef.current =
+        false
+
+      return
+    }
+
     if (
       activeTool !== 'select'
     ) {
       return
     }
 
-    if (event.button !== 0) {
+    if (
+      event.button !== 0
+    ) {
       return
     }
 
@@ -394,13 +475,12 @@ export function CadCanvas({
       return
     }
 
-    const isInsideRuler =
-      screenPosition.xPx <
-        RULER_SIZE_PX ||
-      screenPosition.yPx <
-        RULER_SIZE_PX
-
-    if (isInsideRuler) {
+    if (
+      isInsideRulerArea(
+        screenPosition.xPx,
+        screenPosition.yPx,
+      )
+    ) {
       return
     }
 
@@ -414,9 +494,17 @@ export function CadCanvas({
   }
 
   const handleWheel = (
-    event: WheelEvent<SVGSVGElement>,
+    event:
+      WheelEvent<SVGSVGElement>,
   ) => {
     event.preventDefault()
+
+    if (
+      isDraggingPoint ||
+      isPanning
+    ) {
+      return
+    }
 
     const anchor =
       getLocalScreenPosition(
@@ -446,34 +534,15 @@ export function CadCanvas({
     )
   }
 
-  const handlePointerDown = (
-    event: PointerEvent<SVGSVGElement>,
+  const startPan = (
+    event:
+      PointerEvent<SVGSVGElement>,
+    screenPosition: {
+      xPx: number
+      yPx: number
+    },
   ) => {
-    const useMiddleMouse =
-      event.button === 1
-
-    const usePanTool =
-      activeTool === 'pan' &&
-      event.button === 0
-
-    if (
-      !useMiddleMouse &&
-      !usePanTool
-    ) {
-      return
-    }
-
     event.preventDefault()
-
-    const screenPosition =
-      getLocalScreenPosition(
-        event.clientX,
-        event.clientY,
-      )
-
-    if (!screenPosition) {
-      return
-    }
 
     panDragRef.current = {
       pointerId:
@@ -494,8 +563,124 @@ export function CadCanvas({
     setIsPanning(true)
   }
 
-  const handlePointerMove = (
-    event: PointerEvent<SVGSVGElement>,
+  const startPointDrag = (
+    event:
+      PointerEvent<SVGSVGElement>,
+    pointId: string,
+  ) => {
+    event.preventDefault()
+
+    pointDragRef.current = {
+      pointerId:
+        event.pointerId,
+
+      pointId,
+    }
+
+    dragPreviewRef.current =
+      document
+
+    setDragPreviewDocument(
+      document,
+    )
+
+    setSelection({
+      kind: 'point',
+      id: pointId,
+    })
+
+    event.currentTarget
+      .setPointerCapture(
+        event.pointerId,
+      )
+
+    setIsDraggingPoint(true)
+  }
+
+  const handlePointerDown = (
+    event:
+      PointerEvent<SVGSVGElement>,
+  ) => {
+    const screenPosition =
+      getLocalScreenPosition(
+        event.clientX,
+        event.clientY,
+      )
+
+    if (!screenPosition) {
+      return
+    }
+
+    /*
+     * Middle mouse always pans,
+     * regardless of the active tool.
+     */
+    if (event.button === 1) {
+      startPan(
+        event,
+        screenPosition,
+      )
+
+      return
+    }
+
+    /*
+     * Left mouse pans while the
+     * Pan tool is active.
+     */
+    if (
+      activeTool === 'pan' &&
+      event.button === 0
+    ) {
+      startPan(
+        event,
+        screenPosition,
+      )
+
+      return
+    }
+
+    /*
+     * Select tool:
+     * only POINTS start a drag.
+     *
+     * Lines still use the normal
+     * click-selection behavior.
+     */
+    if (
+      activeTool === 'select' &&
+      event.button === 0
+    ) {
+      if (
+        isInsideRulerArea(
+          screenPosition.xPx,
+          screenPosition.yPx,
+        )
+      ) {
+        return
+      }
+
+      const hit =
+        findSelectionAtScreenPoint(
+          document,
+          viewport,
+          screenPosition,
+        )
+
+      if (
+        hit?.kind === 'point'
+      ) {
+        startPointDrag(
+          event,
+          hit.id,
+        )
+      }
+    }
+  }
+
+  const handlePanPointerMove = (
+    event:
+      PointerEvent<SVGSVGElement>,
   ) => {
     const drag =
       panDragRef.current
@@ -505,7 +690,7 @@ export function CadCanvas({
       drag.pointerId !==
         event.pointerId
     ) {
-      return
+      return false
     }
 
     event.preventDefault()
@@ -517,7 +702,7 @@ export function CadCanvas({
       )
 
     if (!screenPosition) {
-      return
+      return true
     }
 
     const deltaXPx =
@@ -547,27 +732,107 @@ export function CadCanvas({
           deltaYPx,
         ),
     )
+
+    return true
   }
 
-  const finishPan = (
-    event: PointerEvent<SVGSVGElement>,
+  const handlePointPointerMove = (
+    event:
+      PointerEvent<SVGSVGElement>,
   ) => {
     const drag =
-      panDragRef.current
+      pointDragRef.current
 
     if (
       !drag ||
       drag.pointerId !==
         event.pointerId
     ) {
+      return false
+    }
+
+    event.preventDefault()
+
+    const screenPosition =
+      getLocalScreenPosition(
+        event.clientX,
+        event.clientY,
+      )
+
+    if (!screenPosition) {
+      return true
+    }
+
+    const worldPosition =
+      screenToWorld(
+        screenPosition,
+        viewport,
+      )
+
+    /*
+     * Always calculate the preview
+     * from the committed document.
+     *
+     * This means dozens of pointer
+     * moves do NOT create dozens of
+     * document edits.
+     */
+    const preview =
+      movePointToWorldPosition(
+        document,
+        drag.pointId,
+        worldPosition,
+        {
+          snapSpacingMm,
+        },
+      )
+
+    dragPreviewRef.current =
+      preview
+
+    setDragPreviewDocument(
+      preview,
+    )
+
+    const movedPoint =
+      preview.points[
+        drag.pointId
+      ]
+
+    if (movedPoint) {
+      setCursorWorld({
+        xMm:
+          movedPoint.xMm,
+
+        yMm:
+          movedPoint.yMm,
+      })
+    }
+
+    return true
+  }
+
+  const handlePointerMove = (
+    event:
+      PointerEvent<SVGSVGElement>,
+  ) => {
+    if (
+      handlePanPointerMove(
+        event,
+      )
+    ) {
       return
     }
 
-    panDragRef.current =
-      null
+    handlePointPointerMove(
+      event,
+    )
+  }
 
-    setIsPanning(false)
-
+  const releasePointerCapture = (
+    event:
+      PointerEvent<SVGSVGElement>,
+  ) => {
     if (
       event.currentTarget
         .hasPointerCapture(
@@ -581,11 +846,164 @@ export function CadCanvas({
     }
   }
 
+  const finishPan = (
+    event:
+      PointerEvent<SVGSVGElement>,
+  ) => {
+    const drag =
+      panDragRef.current
+
+    if (
+      !drag ||
+      drag.pointerId !==
+        event.pointerId
+    ) {
+      return false
+    }
+
+    panDragRef.current =
+      null
+
+    setIsPanning(false)
+
+    releasePointerCapture(
+      event,
+    )
+
+    return true
+  }
+
+  const finishPointDrag = (
+    event:
+      PointerEvent<SVGSVGElement>,
+  ) => {
+    const drag =
+      pointDragRef.current
+
+    if (
+      !drag ||
+      drag.pointerId !==
+        event.pointerId
+    ) {
+      return false
+    }
+
+    const preview =
+      dragPreviewRef.current
+
+    const changed =
+      preview !== null &&
+      preview !== document
+
+    pointDragRef.current =
+      null
+
+    dragPreviewRef.current =
+      null
+
+    setDragPreviewDocument(
+      null,
+    )
+
+    setIsDraggingPoint(
+      false,
+    )
+
+    releasePointerCapture(
+      event,
+    )
+
+    /*
+     * ONE commit only.
+     *
+     * This is the only place during
+     * point dragging that writes to
+     * pattern history.
+     */
+    if (
+      changed &&
+      preview !== null
+    ) {
+      suppressNextClickRef.current =
+        true
+
+      onDocumentChange(
+        preview,
+      )
+    }
+
+    return true
+  }
+
+  const handlePointerUp = (
+    event:
+      PointerEvent<SVGSVGElement>,
+  ) => {
+    if (
+      finishPan(event)
+    ) {
+      return
+    }
+
+    finishPointDrag(event)
+  }
+
+  const handlePointerCancel = (
+    event:
+      PointerEvent<SVGSVGElement>,
+  ) => {
+    const panDrag =
+      panDragRef.current
+
+    if (
+      panDrag?.pointerId ===
+      event.pointerId
+    ) {
+      panDragRef.current =
+        null
+
+      setIsPanning(false)
+    }
+
+    const pointDrag =
+      pointDragRef.current
+
+    if (
+      pointDrag?.pointerId ===
+      event.pointerId
+    ) {
+      pointDragRef.current =
+        null
+
+      dragPreviewRef.current =
+        null
+
+      setDragPreviewDocument(
+        null,
+      )
+
+      setIsDraggingPoint(
+        false,
+      )
+    }
+
+    releasePointerCapture(
+      event,
+    )
+  }
+
   const setZoomPercent = (
     percent: number,
   ) => {
     if (
       !Number.isFinite(percent)
+    ) {
+      return
+    }
+
+    if (
+      isDraggingPoint ||
+      isPanning
     ) {
       return
     }
@@ -659,7 +1077,8 @@ export function CadCanvas({
   const handleDeleteSelection =
     () => {
       if (
-        selection === null
+        selection === null ||
+        isDraggingPoint
       ) {
         return
       }
@@ -678,7 +1097,11 @@ export function CadCanvas({
     }
 
   const handleUndo = () => {
-    if (!canUndo) {
+    if (
+      !canUndo ||
+      isDraggingPoint ||
+      isPanning
+    ) {
       return
     }
 
@@ -687,7 +1110,11 @@ export function CadCanvas({
   }
 
   const handleRedo = () => {
-    if (!canRedo) {
+    if (
+      !canRedo ||
+      isDraggingPoint ||
+      isPanning
+    ) {
       return
     }
 
@@ -695,21 +1122,23 @@ export function CadCanvas({
     setSelection(null)
   }
 
-  /*
-   * CAD keyboard shortcuts:
-   *
-   * Ctrl+Z          Undo
-   * Ctrl+Y          Redo
-   * Ctrl+Shift+Z    Redo
-   * Delete          Delete selection
-   *
-   * Inputs/selects are ignored so typing
-   * in the zoom box remains safe.
-   */
   useEffect(() => {
     const handleKeyDown = (
-      event: globalThis.KeyboardEvent,
+      event:
+        globalThis.KeyboardEvent,
     ) => {
+      /*
+       * Do not allow destructive
+       * shortcuts halfway through
+       * a drag operation.
+       */
+      if (
+        isDraggingPoint ||
+        isPanning
+      ) {
+        return
+      }
+
       const shortcut =
         getCadShortcut({
           key:
@@ -770,8 +1199,7 @@ export function CadCanvas({
       }
 
       if (
-        shortcut ===
-        'delete'
+        shortcut === 'delete'
       ) {
         if (
           selection === null
@@ -814,10 +1242,13 @@ export function CadCanvas({
     document,
     selection,
     onDocumentChange,
+    isDraggingPoint,
+    isPanning,
   ])
 
   const canvasCursor =
-    isPanning
+    isPanning ||
+    isDraggingPoint
       ? 'grabbing'
       : activeTool === 'pan'
         ? 'grab'
@@ -830,6 +1261,12 @@ export function CadCanvas({
           'point'
         ? `Point ${selection.id}`
         : `Line ${selection.id}`
+
+  const dragDescription =
+    isDraggingPoint &&
+    pointDragRef.current
+      ? `Moving Point ${pointDragRef.current.pointId}`
+      : null
 
   return (
     <div
@@ -850,7 +1287,10 @@ export function CadCanvas({
           handleMouseMove
         }
         onMouseLeave={() => {
-          if (!isPanning) {
+          if (
+            !isPanning &&
+            !isDraggingPoint
+          ) {
             setCursorWorld(null)
           }
         }}
@@ -864,16 +1304,30 @@ export function CadCanvas({
           handlePointerMove
         }
         onPointerUp={
-          finishPan
+          handlePointerUp
         }
         onPointerCancel={
-          finishPan
+          handlePointerCancel
         }
         onLostPointerCapture={() => {
           panDragRef.current =
             null
 
+          pointDragRef.current =
+            null
+
+          dragPreviewRef.current =
+            null
+
+          setDragPreviewDocument(
+            null,
+          )
+
           setIsPanning(false)
+
+          setIsDraggingPoint(
+            false,
+          )
         }}
         style={{
           display: 'block',
@@ -969,15 +1423,15 @@ export function CadCanvas({
         {/* PATTERN LINES */}
 
         {Object.values(
-          document.lines,
+          displayDocument.lines,
         ).map((line) => {
           const startPoint =
-            document.points[
+            displayDocument.points[
               line.startPointId
             ]
 
           const endPoint =
-            document.points[
+            displayDocument.points[
               line.endPointId
             ]
 
@@ -1030,7 +1484,7 @@ export function CadCanvas({
         {/* PATTERN POINTS */}
 
         {Object.values(
-          document.points,
+          displayDocument.points,
         ).map((point) => {
           const screen =
             worldToScreen(
@@ -1085,7 +1539,7 @@ export function CadCanvas({
           )
         })}
 
-        {/* TOP RULER BACKGROUND */}
+        {/* TOP RULER */}
 
         <rect
           x={0}
@@ -1100,7 +1554,7 @@ export function CadCanvas({
           stroke="#cccccc"
         />
 
-        {/* LEFT RULER BACKGROUND */}
+        {/* LEFT RULER */}
 
         <rect
           x={0}
@@ -1325,6 +1779,20 @@ export function CadCanvas({
           {selectedDescription}
         </span>
 
+        <span>
+          Snap:{' '}
+          {formatLength(
+            snapSpacingMm,
+            unit,
+          )}
+        </span>
+
+        {dragDescription && (
+          <strong>
+            {dragDescription}
+          </strong>
+        )}
+
         <div
           style={{
             marginLeft: 'auto',
@@ -1335,30 +1803,28 @@ export function CadCanvas({
         >
           <button
             type="button"
-            disabled={!canUndo}
+            disabled={
+              !canUndo ||
+              isDraggingPoint
+            }
             onClick={
               handleUndo
             }
-            title={
-              canUndo
-                ? 'Undo (Ctrl+Z)'
-                : 'Nothing to undo'
-            }
+            title="Undo (Ctrl+Z)"
           >
             Undo
           </button>
 
           <button
             type="button"
-            disabled={!canRedo}
+            disabled={
+              !canRedo ||
+              isDraggingPoint
+            }
             onClick={
               handleRedo
             }
-            title={
-              canRedo
-                ? 'Redo (Ctrl+Y)'
-                : 'Nothing to redo'
-            }
+            title="Redo (Ctrl+Y)"
           >
             Redo
           </button>
@@ -1374,21 +1840,7 @@ export function CadCanvas({
                 'select',
               )
             }}
-            title="Select points and lines"
-            style={{
-              padding:
-                '2px 8px',
-              fontWeight:
-                activeTool ===
-                'select'
-                  ? 'bold'
-                  : 'normal',
-              background:
-                activeTool ===
-                'select'
-                  ? '#dddddd'
-                  : undefined,
-            }}
+            title="Select and move points"
           >
             Select
           </button>
@@ -1404,21 +1856,7 @@ export function CadCanvas({
                 'pan',
               )
             }}
-            title="Pan the workspace"
-            style={{
-              padding:
-                '2px 8px',
-              fontWeight:
-                activeTool ===
-                'pan'
-                  ? 'bold'
-                  : 'normal',
-              background:
-                activeTool ===
-                'pan'
-                  ? '#dddddd'
-                  : undefined,
-            }}
+            title="Pan workspace"
           >
             Pan
           </button>
@@ -1426,16 +1864,13 @@ export function CadCanvas({
           <button
             type="button"
             disabled={
-              selection === null
+              selection === null ||
+              isDraggingPoint
             }
             onClick={
               handleDeleteSelection
             }
-            title={
-              selection === null
-                ? 'Select an object first'
-                : 'Delete selected object (Delete)'
-            }
+            title="Delete selected object"
           >
             Delete
           </button>
@@ -1452,7 +1887,6 @@ export function CadCanvas({
                   10,
               )
             }}
-            title="Zoom out"
           >
             −
           </button>
@@ -1494,7 +1928,6 @@ export function CadCanvas({
                   10,
               )
             }}
-            title="Zoom in"
           >
             +
           </button>
@@ -1506,7 +1939,6 @@ export function CadCanvas({
                 100,
               )
             }}
-            title="Reset zoom to 100%"
           >
             100%
           </button>
