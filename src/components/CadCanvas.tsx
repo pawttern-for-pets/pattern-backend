@@ -36,6 +36,11 @@ import {
 } from '../cad/rulerDisplay'
 
 import {
+  findSelectionAtScreenPoint,
+  type Selection,
+} from '../cad/selection'
+
+import {
   createViewport,
   screenToWorld,
   worldToScreen,
@@ -60,6 +65,10 @@ interface PanDragState {
   xPx: number
   yPx: number
 }
+
+type ActiveTool =
+  | 'select'
+  | 'pan'
 
 const RULER_SIZE_PX = 32
 const ZOOM_FACTOR = 1.15
@@ -87,6 +96,25 @@ export function CadCanvas({
     null,
   )
 
+  const [
+    selection,
+    setSelection,
+  ] = useState<Selection | null>(
+    null,
+  )
+
+  const [
+    activeTool,
+    setActiveTool,
+  ] = useState<ActiveTool>(
+    'select',
+  )
+
+  const [
+    isPanning,
+    setIsPanning,
+  ] = useState(false)
+
   const [viewport, setViewport] =
     useState(() =>
       createViewport(
@@ -95,16 +123,6 @@ export function CadCanvas({
         120,
       ),
     )
-
-  const [
-    panMode,
-    setPanMode,
-  ] = useState(false)
-
-  const [
-    isPanning,
-    setIsPanning,
-  ] = useState(false)
 
   const zoomPercent =
     Math.round(
@@ -123,7 +141,8 @@ export function CadCanvas({
   }, [zoomPercent])
 
   useEffect(() => {
-    const svg = svgRef.current
+    const svg =
+      svgRef.current
 
     if (!svg) {
       return
@@ -134,8 +153,11 @@ export function CadCanvas({
         svg.getBoundingClientRect()
 
       setCanvasSize({
-        widthPx: rect.width,
-        heightPx: rect.height,
+        widthPx:
+          rect.width,
+
+        heightPx:
+          rect.height,
       })
     }
 
@@ -166,8 +188,11 @@ export function CadCanvas({
       effectivePxPerMm,
     )
 
-  let verticalGridMm: number[] = []
-  let horizontalGridMm: number[] = []
+  let verticalGridMm:
+    number[] = []
+
+  let horizontalGridMm:
+    number[] = []
 
   let horizontalRulerTicks =
     getRulerTicks(
@@ -225,6 +250,31 @@ export function CadCanvas({
       )
   }
 
+  const getLocalScreenPosition = (
+    clientX: number,
+    clientY: number,
+  ) => {
+    const svg =
+      svgRef.current
+
+    if (!svg) {
+      return null
+    }
+
+    const rect =
+      svg.getBoundingClientRect()
+
+    return {
+      xPx:
+        clientX -
+        rect.left,
+
+      yPx:
+        clientY -
+        rect.top,
+    }
+  }
+
   const handleMouseMove = (
     event: MouseEvent<SVGSVGElement>,
   ) => {
@@ -232,23 +282,14 @@ export function CadCanvas({
       return
     }
 
-    const svg = svgRef.current
+    const screenPosition =
+      getLocalScreenPosition(
+        event.clientX,
+        event.clientY,
+      )
 
-    if (!svg) {
+    if (!screenPosition) {
       return
-    }
-
-    const rect =
-      svg.getBoundingClientRect()
-
-    const screenPosition = {
-      xPx:
-        event.clientX -
-        rect.left,
-
-      yPx:
-        event.clientY -
-        rect.top,
     }
 
     setCursorWorld(
@@ -259,28 +300,65 @@ export function CadCanvas({
     )
   }
 
+  const handleCanvasClick = (
+    event: MouseEvent<SVGSVGElement>,
+  ) => {
+    if (
+      activeTool !==
+      'select'
+    ) {
+      return
+    }
+
+    if (event.button !== 0) {
+      return
+    }
+
+    const screenPosition =
+      getLocalScreenPosition(
+        event.clientX,
+        event.clientY,
+      )
+
+    if (!screenPosition) {
+      return
+    }
+
+    const isInsideRuler =
+      screenPosition.xPx <
+        RULER_SIZE_PX ||
+      screenPosition.yPx <
+        RULER_SIZE_PX
+
+    if (isInsideRuler) {
+      return
+    }
+
+    const foundSelection =
+      findSelectionAtScreenPoint(
+        document,
+        viewport,
+        screenPosition,
+      )
+
+    setSelection(
+      foundSelection,
+    )
+  }
+
   const handleWheel = (
     event: WheelEvent<SVGSVGElement>,
   ) => {
     event.preventDefault()
 
-    const svg = svgRef.current
+    const anchor =
+      getLocalScreenPosition(
+        event.clientX,
+        event.clientY,
+      )
 
-    if (!svg) {
+    if (!anchor) {
       return
-    }
-
-    const rect =
-      svg.getBoundingClientRect()
-
-    const anchor = {
-      xPx:
-        event.clientX -
-        rect.left,
-
-      yPx:
-        event.clientY -
-        rect.top,
     }
 
     setViewport(
@@ -307,44 +385,44 @@ export function CadCanvas({
     const useMiddleMouse =
       event.button === 1
 
-    const usePanMode =
-      panMode &&
+    const usePanTool =
+      activeTool === 'pan' &&
       event.button === 0
 
     if (
       !useMiddleMouse &&
-      !usePanMode
+      !usePanTool
     ) {
       return
     }
 
     event.preventDefault()
 
-    const svg = svgRef.current
+    const screenPosition =
+      getLocalScreenPosition(
+        event.clientX,
+        event.clientY,
+      )
 
-    if (!svg) {
+    if (!screenPosition) {
       return
     }
-
-    const rect =
-      svg.getBoundingClientRect()
 
     panDragRef.current = {
       pointerId:
         event.pointerId,
 
       xPx:
-        event.clientX -
-        rect.left,
+        screenPosition.xPx,
 
       yPx:
-        event.clientY -
-        rect.top,
+        screenPosition.yPx,
     }
 
-    event.currentTarget.setPointerCapture(
-      event.pointerId,
-    )
+    event.currentTarget
+      .setPointerCapture(
+        event.pointerId,
+      )
 
     setIsPanning(true)
   }
@@ -365,29 +443,22 @@ export function CadCanvas({
 
     event.preventDefault()
 
-    const svg = svgRef.current
+    const screenPosition =
+      getLocalScreenPosition(
+        event.clientX,
+        event.clientY,
+      )
 
-    if (!svg) {
+    if (!screenPosition) {
       return
     }
 
-    const rect =
-      svg.getBoundingClientRect()
-
-    const currentXPx =
-      event.clientX -
-      rect.left
-
-    const currentYPx =
-      event.clientY -
-      rect.top
-
     const deltaXPx =
-      currentXPx -
+      screenPosition.xPx -
       drag.xPx
 
     const deltaYPx =
-      currentYPx -
+      screenPosition.yPx -
       drag.yPx
 
     panDragRef.current = {
@@ -395,10 +466,10 @@ export function CadCanvas({
         event.pointerId,
 
       xPx:
-        currentXPx,
+        screenPosition.xPx,
 
       yPx:
-        currentYPx,
+        screenPosition.yPx,
     }
 
     setViewport(
@@ -425,18 +496,21 @@ export function CadCanvas({
       return
     }
 
-    panDragRef.current = null
+    panDragRef.current =
+      null
 
     setIsPanning(false)
 
     if (
-      event.currentTarget.hasPointerCapture(
-        event.pointerId,
-      )
+      event.currentTarget
+        .hasPointerCapture(
+          event.pointerId,
+        )
     ) {
-      event.currentTarget.releasePointerCapture(
-        event.pointerId,
-      )
+      event.currentTarget
+        .releasePointerCapture(
+          event.pointerId,
+        )
     }
   }
 
@@ -444,7 +518,9 @@ export function CadCanvas({
     percent: number,
   ) => {
     if (
-      !Number.isFinite(percent)
+      !Number.isFinite(
+        percent,
+      )
     ) {
       return
     }
@@ -477,11 +553,14 @@ export function CadCanvas({
       Number(zoomInput)
 
     if (
-      zoomInput.trim() === '' ||
+      zoomInput.trim() ===
+        '' ||
       !Number.isFinite(value)
     ) {
       setZoomInput(
-        String(zoomPercent),
+        String(
+          zoomPercent,
+        ),
       )
 
       return
@@ -493,46 +572,75 @@ export function CadCanvas({
   const handleZoomKeyDown = (
     event: KeyboardEvent<HTMLInputElement>,
   ) => {
-    if (event.key === 'Enter') {
+    if (
+      event.key ===
+      'Enter'
+    ) {
       applyZoomInput()
 
-      event.currentTarget.blur()
+      event.currentTarget
+        .blur()
     }
 
-    if (event.key === 'Escape') {
+    if (
+      event.key ===
+      'Escape'
+    ) {
       setZoomInput(
-        String(zoomPercent),
+        String(
+          zoomPercent,
+        ),
       )
 
-      event.currentTarget.blur()
+      event.currentTarget
+        .blur()
     }
   }
 
   const canvasCursor =
     isPanning
       ? 'grabbing'
-      : panMode
+      : activeTool ===
+          'pan'
         ? 'grab'
-        : 'crosshair'
+        : 'default'
+
+  const selectedDescription =
+    selection === null
+      ? '—'
+      : selection.kind ===
+          'point'
+        ? `Point ${selection.id}`
+        : `Line ${selection.id}`
 
   return (
     <div
       style={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
+        position:
+          'relative',
+
+        width:
+          '100%',
+
+        height:
+          '100%',
       }}
     >
       <svg
         ref={svgRef}
         width="100%"
         height="100%"
+        onClick={
+          handleCanvasClick
+        }
         onMouseMove={
           handleMouseMove
         }
         onMouseLeave={() => {
           if (!isPanning) {
-            setCursorWorld(null)
+            setCursorWorld(
+              null,
+            )
           }
         }}
         onWheel={
@@ -554,16 +662,28 @@ export function CadCanvas({
           panDragRef.current =
             null
 
-          setIsPanning(false)
+          setIsPanning(
+            false,
+          )
         }}
         style={{
-          display: 'block',
-          background: 'white',
+          display:
+            'block',
+
+          background:
+            'white',
+
           border:
             '1px solid #cccccc',
-          touchAction: 'none',
-          userSelect: 'none',
-          cursor: canvasCursor,
+
+          touchAction:
+            'none',
+
+          userSelect:
+            'none',
+
+          cursor:
+            canvasCursor,
         }}
       >
         {/* GRID */}
@@ -586,9 +706,13 @@ export function CadCanvas({
               return (
                 <line
                   key={`grid-x-${xMm}`}
-                  x1={screen.xPx}
+                  x1={
+                    screen.xPx
+                  }
                   y1={0}
-                  x2={screen.xPx}
+                  x2={
+                    screen.xPx
+                  }
                   y2={
                     canvasSize.heightPx
                   }
@@ -625,11 +749,15 @@ export function CadCanvas({
                 <line
                   key={`grid-y-${yMm}`}
                   x1={0}
-                  y1={screen.yPx}
+                  y1={
+                    screen.yPx
+                  }
                   x2={
                     canvasSize.widthPx
                   }
-                  y2={screen.yPx}
+                  y2={
+                    screen.yPx
+                  }
                   stroke={
                     isOrigin
                       ? '#b0b0b0'
@@ -680,6 +808,12 @@ export function CadCanvas({
               viewport,
             )
 
+          const isSelected =
+            selection?.kind ===
+              'line' &&
+            selection.id ===
+              line.id
+
           return (
             <line
               key={line.id}
@@ -687,8 +821,16 @@ export function CadCanvas({
               y1={start.yPx}
               x2={end.xPx}
               y2={end.yPx}
-              stroke="black"
-              strokeWidth="2"
+              stroke={
+                isSelected
+                  ? '#2563eb'
+                  : 'black'
+              }
+              strokeWidth={
+                isSelected
+                  ? 4
+                  : 2
+              }
             />
           )
         })}
@@ -704,13 +846,44 @@ export function CadCanvas({
               viewport,
             )
 
+          const isSelected =
+            selection?.kind ===
+              'point' &&
+            selection.id ===
+              point.id
+
           return (
-            <g key={point.id}>
+            <g
+              key={point.id}
+            >
+              {isSelected && (
+                <circle
+                  cx={
+                    screen.xPx
+                  }
+                  cy={
+                    screen.yPx
+                  }
+                  r={9}
+                  fill="none"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                />
+              )}
+
               <circle
-                cx={screen.xPx}
-                cy={screen.yPx}
-                r="5"
-                fill="black"
+                cx={
+                  screen.xPx
+                }
+                cy={
+                  screen.yPx
+                }
+                r={5}
+                fill={
+                  isSelected
+                    ? '#2563eb'
+                    : 'black'
+                }
               />
 
               <text
@@ -770,6 +943,7 @@ export function CadCanvas({
                   {
                     xMm:
                       tick.positionMm,
+
                     yMm: 0,
                   },
                   viewport,
@@ -785,7 +959,8 @@ export function CadCanvas({
                     : 5
 
               const showLabel =
-                tick.label !== null &&
+                tick.label !==
+                  null &&
                 shouldShowRulerLabel(
                   tick.positionMm,
                   unit,
@@ -842,6 +1017,7 @@ export function CadCanvas({
                 worldToScreen(
                   {
                     xMm: 0,
+
                     yMm:
                       tick.positionMm,
                   },
@@ -858,7 +1034,8 @@ export function CadCanvas({
                     : 5
 
               const showLabel =
-                tick.label !== null &&
+                tick.label !==
+                  null &&
                 shouldShowRulerLabel(
                   tick.positionMm,
                   unit,
@@ -935,20 +1112,36 @@ export function CadCanvas({
 
       <div
         style={{
-          position: 'absolute',
+          position:
+            'absolute',
+
           left: 0,
           right: 0,
           bottom: 0,
-          minHeight: '32px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '18px',
-          padding: '3px 12px',
+
+          minHeight:
+            '32px',
+
+          display:
+            'flex',
+
+          alignItems:
+            'center',
+
+          gap:
+            '16px',
+
+          padding:
+            '3px 12px',
+
           background:
             'rgba(245,245,245,0.97)',
+
           borderTop:
             '1px solid #cccccc',
-          fontSize: '12px',
+
+          fontSize:
+            '12px',
         }}
       >
         <span>
@@ -975,41 +1168,85 @@ export function CadCanvas({
           Unit: {unit}
         </span>
 
-        {/* NAVIGATION CONTROLS */}
+        <span>
+          Selected:{' '}
+          {selectedDescription}
+        </span>
+
+        {/* NAVIGATION / TOOL CONTROLS */}
 
         <div
           style={{
-            marginLeft: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
+            marginLeft:
+              'auto',
+
+            display:
+              'flex',
+
+            alignItems:
+              'center',
+
+            gap:
+              '8px',
           }}
         >
           <button
             type="button"
             aria-pressed={
-              panMode
+              activeTool ===
+              'select'
             }
             onClick={() => {
-              setPanMode(
-                (current) =>
-                  !current,
+              setActiveTool(
+                'select',
               )
             }}
-            title={
-              panMode
-                ? 'Turn Pan mode off'
-                : 'Turn Pan mode on'
-            }
+            title="Select points and lines"
             style={{
               padding:
                 '2px 8px',
+
               fontWeight:
-                panMode
+                activeTool ===
+                'select'
                   ? 'bold'
                   : 'normal',
+
               background:
-                panMode
+                activeTool ===
+                'select'
+                  ? '#dddddd'
+                  : undefined,
+            }}
+          >
+            Select
+          </button>
+
+          <button
+            type="button"
+            aria-pressed={
+              activeTool ===
+              'pan'
+            }
+            onClick={() => {
+              setActiveTool(
+                'pan',
+              )
+            }}
+            title="Pan the workspace"
+            style={{
+              padding:
+                '2px 8px',
+
+              fontWeight:
+                activeTool ===
+                'pan'
+                  ? 'bold'
+                  : 'normal',
+
+              background:
+                activeTool ===
+                'pan'
                   ? '#dddddd'
                   : undefined,
             }}
@@ -1019,10 +1256,14 @@ export function CadCanvas({
 
           <div
             style={{
-              display: 'flex',
+              display:
+                'flex',
+
               alignItems:
                 'center',
-              gap: '5px',
+
+              gap:
+                '5px',
             }}
           >
             <span>
@@ -1066,15 +1307,20 @@ export function CadCanvas({
               }
               aria-label="Zoom percentage"
               style={{
-                width: '65px',
+                width:
+                  '65px',
+
                 textAlign:
                   'right',
+
                 padding:
                   '2px 4px',
               }}
             />
 
-            <span>%</span>
+            <span>
+              %
+            </span>
 
             <button
               type="button"
