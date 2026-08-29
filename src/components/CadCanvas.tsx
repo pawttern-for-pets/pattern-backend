@@ -26,6 +26,11 @@ import {
 } from '../cad/ruler'
 
 import {
+  getRulerLabelEveryMajor,
+  shouldShowRulerLabel,
+} from '../cad/rulerDisplay'
+
+import {
   createViewport,
   screenToWorld,
   worldToScreen,
@@ -126,6 +131,16 @@ export function CadCanvas({
 
   const gridSpacingMm =
     getGridSpacingMm(unit)
+
+  const effectivePxPerMm =
+    viewport.pxPerMm *
+    viewport.zoom
+
+  const rulerLabelEveryMajor =
+    getRulerLabelEveryMajor(
+      unit,
+      effectivePxPerMm,
+    )
 
   let verticalGridMm: number[] = []
   let horizontalGridMm: number[] = []
@@ -572,6 +587,14 @@ export function CadCanvas({
                     ? 8
                     : 5
 
+              const showLabel =
+                tick.label !== null &&
+                shouldShowRulerLabel(
+                  tick.positionMm,
+                  unit,
+                  rulerLabelEveryMajor,
+                )
+
               return (
                 <g
                   key={`ruler-x-${tick.positionMm}`}
@@ -593,8 +616,7 @@ export function CadCanvas({
                     stroke="#555555"
                   />
 
-                  {tick.label !==
-                    null && (
+                  {showLabel && (
                     <text
                       x={
                         screen.xPx +
@@ -638,6 +660,14 @@ export function CadCanvas({
                     ? 8
                     : 5
 
+              const showLabel =
+                tick.label !== null &&
+                shouldShowRulerLabel(
+                  tick.positionMm,
+                  unit,
+                  rulerLabelEveryMajor,
+                )
+
               return (
                 <g
                   key={`ruler-y-${tick.positionMm}`}
@@ -659,8 +689,7 @@ export function CadCanvas({
                     stroke="#555555"
                   />
 
-                  {tick.label !==
-                    null && (
+                  {showLabel && (
                     <text
                       x={3}
                       y={
