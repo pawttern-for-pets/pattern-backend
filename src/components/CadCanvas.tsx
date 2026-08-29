@@ -12,6 +12,11 @@ import type { WorldPosition } from '../cad/coordinates'
 import type { PatternDocument } from '../cad/document'
 
 import {
+  displayCoordinatesToWorld,
+  worldCoordinatesToDisplay,
+} from '../cad/coordinateInput'
+
+import {
   formatLength,
   getGridSpacingMm,
   getSnapSpacingMm,
@@ -119,6 +124,14 @@ function isEditableElement(
   )
 }
 
+function formatCoordinateInput(
+  value: number,
+): string {
+  return Number(
+    value.toFixed(6),
+  ).toString()
+}
+
 export function CadCanvas({
   document,
   unit,
@@ -200,13 +213,28 @@ export function CadCanvas({
     ),
   )
 
-  /*
-   * During a point drag we render the
-   * local preview document.
-   *
-   * Nothing is written to history until
-   * the mouse button is released.
-   */
+  const [
+    zoomInput,
+    setZoomInput,
+  ] = useState('100')
+
+  const [
+    coordinateXInput,
+    setCoordinateXInput,
+  ] = useState('')
+
+  const [
+    coordinateYInput,
+    setCoordinateYInput,
+  ] = useState('')
+
+  const [
+    coordinateError,
+    setCoordinateError,
+  ] = useState<string | null>(
+    null,
+  )
+
   const displayDocument =
     dragPreviewDocument ??
     document
@@ -216,10 +244,12 @@ export function CadCanvas({
       viewport.zoom * 100,
     )
 
-  const [
-    zoomInput,
-    setZoomInput,
-  ] = useState('100')
+  const selectedPoint =
+    selection?.kind === 'point'
+      ? document.points[
+          selection.id
+        ] ?? null
+      : null
 
   useEffect(() => {
     setZoomInput(
@@ -286,6 +316,64 @@ export function CadCanvas({
   }, [
     document,
     selection,
+  ])
+
+  /*
+   * Keep the exact-coordinate editor
+   * synchronized with the selected
+   * committed point.
+   *
+   * Switching cm/in automatically
+   * converts the displayed values
+   * without changing geometry.
+   */
+  useEffect(() => {
+    if (
+      selection?.kind !== 'point'
+    ) {
+      setCoordinateXInput('')
+      setCoordinateYInput('')
+      setCoordinateError(null)
+
+      return
+    }
+
+    const point =
+      document.points[
+        selection.id
+      ]
+
+    if (!point) {
+      setCoordinateXInput('')
+      setCoordinateYInput('')
+      setCoordinateError(null)
+
+      return
+    }
+
+    const displayed =
+      worldCoordinatesToDisplay(
+        point,
+        unit,
+      )
+
+    setCoordinateXInput(
+      formatCoordinateInput(
+        displayed.x,
+      ),
+    )
+
+    setCoordinateYInput(
+      formatCoordinateInput(
+        displayed.y,
+      ),
+    )
+
+    setCoordinateError(null)
+  }, [
+    selection,
+    document,
+    unit,
   ])
 
   const gridSpacingMm =
@@ -436,14 +524,6 @@ export function CadCanvas({
     event:
       MouseEvent<SVGSVGElement>,
   ) => {
-    /*
-     * A drag normally creates a click
-     * event after pointer-up.
-     *
-     * Ignore that one click so the
-     * newly moved point does not lose
-     * its selection.
-     */
     if (
       suppressNextClickRef.current
     ) {
@@ -459,9 +539,7 @@ export function CadCanvas({
       return
     }
 
-    if (
-      event.button !== 0
-    ) {
+    if (event.button !== 0) {
       return
     }
 
@@ -611,10 +689,6 @@ export function CadCanvas({
       return
     }
 
-    /*
-     * Middle mouse always pans,
-     * regardless of the active tool.
-     */
     if (event.button === 1) {
       startPan(
         event,
@@ -624,10 +698,6 @@ export function CadCanvas({
       return
     }
 
-    /*
-     * Left mouse pans while the
-     * Pan tool is active.
-     */
     if (
       activeTool === 'pan' &&
       event.button === 0
@@ -640,13 +710,6 @@ export function CadCanvas({
       return
     }
 
-    /*
-     * Select tool:
-     * only POINTS start a drag.
-     *
-     * Lines still use the normal
-     * click-selection behavior.
-     */
     if (
       activeTool === 'select' &&
       event.button === 0
@@ -769,14 +832,6 @@ export function CadCanvas({
         viewport,
       )
 
-    /*
-     * Always calculate the preview
-     * from the committed document.
-     *
-     * This means dozens of pointer
-     * moves do NOT create dozens of
-     * document edits.
-     */
     const preview =
       movePointToWorldPosition(
         document,
@@ -913,13 +968,6 @@ export function CadCanvas({
       event,
     )
 
-    /*
-     * ONE commit only.
-     *
-     * This is the only place during
-     * point dragging that writes to
-     * pattern history.
-     */
     if (
       changed &&
       preview !== null
@@ -1074,6 +1122,163 @@ export function CadCanvas({
     }
   }
 
+  const resetCoordinateInputs =
+    () => {
+      if (!selectedPoint) {
+        return
+      }
+
+      const displayed =
+        worldCoordinatesToDisplay(
+          selectedPoint,
+          unit,
+        )
+
+      setCoordinateXInput(
+        formatCoordinateInput(
+          displayed.x,
+        ),
+      )
+
+      setCoordinateYInput(
+        formatCoordinateInput(
+          displayed.y,
+        ),
+      )
+
+      setCoordinateError(null)
+    }
+
+  const applyExactPointPosition =
+    () => {
+      if (
+        selection?.kind !==
+          'point' ||
+        !selectedPoint ||
+        isDraggingPoint
+      ) {
+        return
+      }
+
+      if (
+        coordinateXInput.trim() ===
+          '' ||
+        coordinateYInput.trim() ===
+          ''
+      ) {
+        setCoordinateError(
+          'Enter both X and Y.',
+        )
+
+        return
+      }
+
+      const x =
+        Number(
+          coordinateXInput,
+        )
+
+      const y =
+        Number(
+          coordinateYInput,
+        )
+
+      if (
+        !Number.isFinite(x) ||
+        !Number.isFinite(y)
+      ) {
+        setCoordinateError(
+          'X and Y must be valid numbers.',
+        )
+
+        return
+      }
+
+      try {
+        const worldPosition =
+          displayCoordinatesToWorld(
+            {
+              x,
+              y,
+            },
+            unit,
+          )
+
+        /*
+         * IMPORTANT:
+         * Exact coordinate entry does
+         * NOT use grid snapping.
+         */
+        const nextDocument =
+          movePointToWorldPosition(
+            document,
+            selection.id,
+            worldPosition,
+            {
+              snapSpacingMm:
+                null,
+            },
+          )
+
+        onDocumentChange(
+          nextDocument,
+        )
+
+        const nextPoint =
+          nextDocument.points[
+            selection.id
+          ]
+
+        if (nextPoint) {
+          const displayed =
+            worldCoordinatesToDisplay(
+              nextPoint,
+              unit,
+            )
+
+          setCoordinateXInput(
+            formatCoordinateInput(
+              displayed.x,
+            ),
+          )
+
+          setCoordinateYInput(
+            formatCoordinateInput(
+              displayed.y,
+            ),
+          )
+        }
+
+        setCoordinateError(null)
+      } catch {
+        setCoordinateError(
+          'Could not apply that position.',
+        )
+      }
+    }
+
+  const handleCoordinateKeyDown = (
+    event:
+      ReactKeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (
+      event.key === 'Enter'
+    ) {
+      applyExactPointPosition()
+
+      return
+    }
+
+    if (
+      event.key === 'Escape'
+    ) {
+      resetCoordinateInputs()
+
+      event.currentTarget
+        .blur()
+    }
+  }
+
   const handleDeleteSelection =
     () => {
       if (
@@ -1127,11 +1332,6 @@ export function CadCanvas({
       event:
         globalThis.KeyboardEvent,
     ) => {
-      /*
-       * Do not allow destructive
-       * shortcuts halfway through
-       * a drag operation.
-       */
       if (
         isDraggingPoint ||
         isPanning
@@ -1199,7 +1399,8 @@ export function CadCanvas({
       }
 
       if (
-        shortcut === 'delete'
+        shortcut ===
+        'delete'
       ) {
         if (
           selection === null
@@ -1730,7 +1931,7 @@ export function CadCanvas({
         </text>
       </svg>
 
-      {/* STATUS BAR */}
+      {/* STATUS / TOOL BAR */}
 
       <div
         style={{
@@ -1738,11 +1939,12 @@ export function CadCanvas({
           left: 0,
           right: 0,
           bottom: 0,
-          minHeight: '32px',
+          minHeight: '34px',
           display: 'flex',
           alignItems: 'center',
+          flexWrap: 'wrap',
           gap: '10px',
-          padding: '3px 12px',
+          padding: '4px 12px',
           background:
             'rgba(245,245,245,0.97)',
           borderTop:
@@ -1780,12 +1982,124 @@ export function CadCanvas({
         </span>
 
         <span>
-          Snap:{' '}
+          Drag snap:{' '}
           {formatLength(
             snapSpacingMm,
             unit,
           )}
         </span>
+
+        {selectedPoint && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding:
+                '2px 6px',
+              border:
+                '1px solid #cccccc',
+              background:
+                '#ffffff',
+            }}
+          >
+            <strong>
+              Point {selectedPoint.name}
+            </strong>
+
+            <label>
+              X{' '}
+              <input
+                type="number"
+                step="any"
+                value={
+                  coordinateXInput
+                }
+                onChange={(
+                  event,
+                ) => {
+                  setCoordinateXInput(
+                    event.target
+                      .value,
+                  )
+
+                  setCoordinateError(
+                    null,
+                  )
+                }}
+                onKeyDown={
+                  handleCoordinateKeyDown
+                }
+                aria-label="Exact point X coordinate"
+                style={{
+                  width:
+                    '78px',
+                }}
+              />
+            </label>
+
+            <label>
+              Y{' '}
+              <input
+                type="number"
+                step="any"
+                value={
+                  coordinateYInput
+                }
+                onChange={(
+                  event,
+                ) => {
+                  setCoordinateYInput(
+                    event.target
+                      .value,
+                  )
+
+                  setCoordinateError(
+                    null,
+                  )
+                }}
+                onKeyDown={
+                  handleCoordinateKeyDown
+                }
+                aria-label="Exact point Y coordinate"
+                style={{
+                  width:
+                    '78px',
+                }}
+              />
+            </label>
+
+            <span>
+              {unit}
+            </span>
+
+            <button
+              type="button"
+              disabled={
+                isDraggingPoint
+              }
+              onClick={
+                applyExactPointPosition
+              }
+              title="Apply exact point position"
+            >
+              Apply
+            </button>
+
+            {coordinateError && (
+              <span
+                style={{
+                  color:
+                    '#b00020',
+                }}
+              >
+                {
+                  coordinateError
+                }
+              </span>
+            )}
+          </div>
+        )}
 
         {dragDescription && (
           <strong>
