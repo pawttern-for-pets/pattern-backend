@@ -10,9 +10,7 @@ import {
   createEmptyDocument,
 } from './cad/document'
 
-import type {
-  DisplayUnit,
-} from './cad/display'
+import type { DisplayUnit } from './cad/display'
 
 function createDemoPattern() {
   let document = createEmptyDocument()

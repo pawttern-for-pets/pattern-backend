@@ -24,7 +24,9 @@
   flex: 1;
   padding: 20px;
   overflow: hidden;
-}.unitControl {
+}
+
+.unitControl {
   margin-left: auto;
   display: flex;
   align-items: center;
