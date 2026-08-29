@@ -4,6 +4,7 @@ import {
   useState,
   type KeyboardEvent,
   type MouseEvent,
+  type PointerEvent,
   type WheelEvent,
 } from 'react'
 
@@ -20,6 +21,10 @@ import {
   getGridPositionsMm,
   getVisibleWorldBounds,
 } from '../cad/grid'
+
+import {
+  panViewportByScreenDelta,
+} from '../cad/pan'
 
 import {
   getRulerTicks,
@@ -50,6 +55,12 @@ interface CanvasSize {
   heightPx: number
 }
 
+interface PanDragState {
+  pointerId: number
+  xPx: number
+  yPx: number
+}
+
 const RULER_SIZE_PX = 32
 const ZOOM_FACTOR = 1.15
 
@@ -59,6 +70,9 @@ export function CadCanvas({
 }: CadCanvasProps) {
   const svgRef =
     useRef<SVGSVGElement | null>(null)
+
+  const panDragRef =
+    useRef<PanDragState | null>(null)
 
   const [canvasSize, setCanvasSize] =
     useState<CanvasSize>({
@@ -81,6 +95,16 @@ export function CadCanvas({
         120,
       ),
     )
+
+  const [
+    panMode,
+    setPanMode,
+  ] = useState(false)
+
+  const [
+    isPanning,
+    setIsPanning,
+  ] = useState(false)
 
   const zoomPercent =
     Math.round(
@@ -204,6 +228,10 @@ export function CadCanvas({
   const handleMouseMove = (
     event: MouseEvent<SVGSVGElement>,
   ) => {
+    if (isPanning) {
+      return
+    }
+
     const svg = svgRef.current
 
     if (!svg) {
@@ -223,14 +251,11 @@ export function CadCanvas({
         rect.top,
     }
 
-    const worldPosition =
+    setCursorWorld(
       screenToWorld(
         screenPosition,
         viewport,
-      )
-
-    setCursorWorld(
-      worldPosition,
+      ),
     )
   }
 
@@ -276,6 +301,145 @@ export function CadCanvas({
     )
   }
 
+  const handlePointerDown = (
+    event: PointerEvent<SVGSVGElement>,
+  ) => {
+    const useMiddleMouse =
+      event.button === 1
+
+    const usePanMode =
+      panMode &&
+      event.button === 0
+
+    if (
+      !useMiddleMouse &&
+      !usePanMode
+    ) {
+      return
+    }
+
+    event.preventDefault()
+
+    const svg = svgRef.current
+
+    if (!svg) {
+      return
+    }
+
+    const rect =
+      svg.getBoundingClientRect()
+
+    panDragRef.current = {
+      pointerId:
+        event.pointerId,
+
+      xPx:
+        event.clientX -
+        rect.left,
+
+      yPx:
+        event.clientY -
+        rect.top,
+    }
+
+    event.currentTarget.setPointerCapture(
+      event.pointerId,
+    )
+
+    setIsPanning(true)
+  }
+
+  const handlePointerMove = (
+    event: PointerEvent<SVGSVGElement>,
+  ) => {
+    const drag =
+      panDragRef.current
+
+    if (
+      !drag ||
+      drag.pointerId !==
+        event.pointerId
+    ) {
+      return
+    }
+
+    event.preventDefault()
+
+    const svg = svgRef.current
+
+    if (!svg) {
+      return
+    }
+
+    const rect =
+      svg.getBoundingClientRect()
+
+    const currentXPx =
+      event.clientX -
+      rect.left
+
+    const currentYPx =
+      event.clientY -
+      rect.top
+
+    const deltaXPx =
+      currentXPx -
+      drag.xPx
+
+    const deltaYPx =
+      currentYPx -
+      drag.yPx
+
+    panDragRef.current = {
+      pointerId:
+        event.pointerId,
+
+      xPx:
+        currentXPx,
+
+      yPx:
+        currentYPx,
+    }
+
+    setViewport(
+      (currentViewport) =>
+        panViewportByScreenDelta(
+          currentViewport,
+          deltaXPx,
+          deltaYPx,
+        ),
+    )
+  }
+
+  const finishPan = (
+    event: PointerEvent<SVGSVGElement>,
+  ) => {
+    const drag =
+      panDragRef.current
+
+    if (
+      !drag ||
+      drag.pointerId !==
+        event.pointerId
+    ) {
+      return
+    }
+
+    panDragRef.current = null
+
+    setIsPanning(false)
+
+    if (
+      event.currentTarget.hasPointerCapture(
+        event.pointerId,
+      )
+    ) {
+      event.currentTarget.releasePointerCapture(
+        event.pointerId,
+      )
+    }
+  }
+
   const setZoomPercent = (
     percent: number,
   ) => {
@@ -290,10 +454,12 @@ export function CadCanvas({
 
     const anchor = {
       xPx:
-        canvasSize.widthPx / 2,
+        canvasSize.widthPx /
+        2,
 
       yPx:
-        canvasSize.heightPx / 2,
+        canvasSize.heightPx /
+        2,
     }
 
     setViewport(
@@ -342,6 +508,13 @@ export function CadCanvas({
     }
   }
 
+  const canvasCursor =
+    isPanning
+      ? 'grabbing'
+      : panMode
+        ? 'grab'
+        : 'crosshair'
+
   return (
     <div
       style={{
@@ -358,15 +531,39 @@ export function CadCanvas({
           handleMouseMove
         }
         onMouseLeave={() => {
-          setCursorWorld(null)
+          if (!isPanning) {
+            setCursorWorld(null)
+          }
         }}
-        onWheel={handleWheel}
+        onWheel={
+          handleWheel
+        }
+        onPointerDown={
+          handlePointerDown
+        }
+        onPointerMove={
+          handlePointerMove
+        }
+        onPointerUp={
+          finishPan
+        }
+        onPointerCancel={
+          finishPan
+        }
+        onLostPointerCapture={() => {
+          panDragRef.current =
+            null
+
+          setIsPanning(false)
+        }}
         style={{
           display: 'block',
           background: 'white',
           border:
             '1px solid #cccccc',
           touchAction: 'none',
+          userSelect: 'none',
+          cursor: canvasCursor,
         }}
       >
         {/* GRID */}
@@ -745,7 +942,7 @@ export function CadCanvas({
           minHeight: '32px',
           display: 'flex',
           alignItems: 'center',
-          gap: '24px',
+          gap: '18px',
           padding: '3px 12px',
           background:
             'rgba(245,245,245,0.97)',
@@ -778,88 +975,132 @@ export function CadCanvas({
           Unit: {unit}
         </span>
 
-        {/* ZOOM CONTROLS */}
+        {/* NAVIGATION CONTROLS */}
 
         <div
           style={{
             marginLeft: 'auto',
             display: 'flex',
             alignItems: 'center',
-            gap: '5px',
+            gap: '10px',
           }}
         >
-          <span>
-            Zoom:
-          </span>
-
           <button
             type="button"
+            aria-pressed={
+              panMode
+            }
             onClick={() => {
-              setZoomPercent(
-                zoomPercent -
-                10,
+              setPanMode(
+                (current) =>
+                  !current,
               )
             }}
-            title="Zoom out"
-          >
-            −
-          </button>
-
-          <input
-            type="number"
-            min="10"
-            max="1000"
-            step="10"
-            value={zoomInput}
-            onChange={(
-              event,
-            ) => {
-              setZoomInput(
-                event.target.value,
-              )
-            }}
-            onBlur={
-              applyZoomInput
+            title={
+              panMode
+                ? 'Turn Pan mode off'
+                : 'Turn Pan mode on'
             }
-            onKeyDown={
-              handleZoomKeyDown
-            }
-            aria-label="Zoom percentage"
             style={{
-              width: '65px',
-              textAlign:
-                'right',
               padding:
-                '2px 4px',
+                '2px 8px',
+              fontWeight:
+                panMode
+                  ? 'bold'
+                  : 'normal',
+              background:
+                panMode
+                  ? '#dddddd'
+                  : undefined,
             }}
-          />
-
-          <span>%</span>
-
-          <button
-            type="button"
-            onClick={() => {
-              setZoomPercent(
-                zoomPercent +
-                10,
-              )
-            }}
-            title="Zoom in"
           >
-            +
+            Pan
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setZoomPercent(
-                100,
-              )
+          <div
+            style={{
+              display: 'flex',
+              alignItems:
+                'center',
+              gap: '5px',
             }}
-            title="Reset zoom to 100%"
           >
-            100%
-          </button>
+            <span>
+              Zoom:
+            </span>
+
+            <button
+              type="button"
+              onClick={() => {
+                setZoomPercent(
+                  zoomPercent -
+                    10,
+                )
+              }}
+              title="Zoom out"
+            >
+              −
+            </button>
+
+            <input
+              type="number"
+              min="10"
+              max="1000"
+              step="10"
+              value={
+                zoomInput
+              }
+              onChange={(
+                event,
+              ) => {
+                setZoomInput(
+                  event.target
+                    .value,
+                )
+              }}
+              onBlur={
+                applyZoomInput
+              }
+              onKeyDown={
+                handleZoomKeyDown
+              }
+              aria-label="Zoom percentage"
+              style={{
+                width: '65px',
+                textAlign:
+                  'right',
+                padding:
+                  '2px 4px',
+              }}
+            />
+
+            <span>%</span>
+
+            <button
+              type="button"
+              onClick={() => {
+                setZoomPercent(
+                  zoomPercent +
+                    10,
+                )
+              }}
+              title="Zoom in"
+            >
+              +
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setZoomPercent(
+                  100,
+                )
+              }}
+              title="Reset zoom to 100%"
+            >
+              100%
+            </button>
+          </div>
         </div>
       </div>
     </div>
