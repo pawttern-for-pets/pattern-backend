@@ -8,13 +8,28 @@ import {
   type WheelEvent,
 } from 'react'
 
-import type { WorldPosition } from '../cad/coordinates'
-import type { PatternDocument } from '../cad/document'
+import type {
+  ScreenPosition,
+  WorldPosition,
+} from '../cad/coordinates'
+
+import type {
+  PatternDocument,
+} from '../cad/document'
 
 import {
   displayCoordinatesToWorld,
   worldCoordinatesToDisplay,
 } from '../cad/coordinateInput'
+
+import {
+  createCurveBetweenPoints,
+} from '../cad/curveCreation'
+
+import {
+  moveCurveControlToWorldPosition,
+  type CurveControlHandle,
+} from '../cad/curveEditing'
 
 import {
   formatLength,
@@ -63,6 +78,7 @@ import {
 
 import {
   findSelectionAtScreenPoint,
+  screenDistancePx,
   type Selection,
 } from '../cad/selection'
 
@@ -111,15 +127,25 @@ interface PointDragState {
   pointId: string
 }
 
+interface CurveHandleDragState {
+  pointerId: number
+  curveId: string
+  handle: CurveControlHandle
+}
+
 type ActiveTool =
   | 'select'
   | 'point'
   | 'line'
+  | 'curve'
   | 'measure'
   | 'pan'
 
 const RULER_SIZE_PX = 32
 const ZOOM_FACTOR = 1.15
+
+const CURVE_HANDLE_HIT_TOLERANCE_PX =
+  12
 
 function isEditableElement(
   target: EventTarget | null,
@@ -157,16 +183,29 @@ export function CadCanvas({
   onRedo,
 }: CadCanvasProps) {
   const svgRef =
-    useRef<SVGSVGElement | null>(null)
+    useRef<SVGSVGElement | null>(
+      null,
+    )
 
   const panDragRef =
-    useRef<PanDragState | null>(null)
+    useRef<PanDragState | null>(
+      null,
+    )
 
   const pointDragRef =
-    useRef<PointDragState | null>(null)
+    useRef<PointDragState | null>(
+      null,
+    )
+
+  const curveHandleDragRef =
+    useRef<
+      CurveHandleDragState | null
+    >(null)
 
   const dragPreviewRef =
-    useRef<PatternDocument | null>(null)
+    useRef<PatternDocument | null>(
+      null,
+    )
 
   const suppressNextClickRef =
     useRef(false)
@@ -215,6 +254,20 @@ export function CadCanvas({
   )
 
   const [
+    curveStartPointId,
+    setCurveStartPointId,
+  ] = useState<string | null>(
+    null,
+  )
+
+  const [
+    curveToolMessage,
+    setCurveToolMessage,
+  ] = useState<string | null>(
+    null,
+  )
+
+  const [
     measureStartPointId,
     setMeasureStartPointId,
   ] = useState<string | null>(
@@ -243,6 +296,11 @@ export function CadCanvas({
   const [
     isDraggingPoint,
     setIsDraggingPoint,
+  ] = useState(false)
+
+  const [
+    isDraggingCurveHandle,
+    setIsDraggingCurveHandle,
   ] = useState(false)
 
   const [
@@ -289,6 +347,10 @@ export function CadCanvas({
     dragPreviewDocument ??
     document
 
+  const isDraggingGeometry =
+    isDraggingPoint ||
+    isDraggingCurveHandle
+
   const zoomPercent =
     Math.round(
       viewport.zoom * 100,
@@ -299,6 +361,59 @@ export function CadCanvas({
       ? document.points[
           selection.id
         ] ?? null
+      : null
+
+  const selectedCurve =
+    selection?.kind === 'curve'
+      ? displayDocument.curves[
+          selection.id
+        ] ?? null
+      : null
+
+  const selectedCurveStartPoint =
+    selectedCurve
+      ? displayDocument.points[
+          selectedCurve.startPointId
+        ] ?? null
+      : null
+
+  const selectedCurveEndPoint =
+    selectedCurve
+      ? displayDocument.points[
+          selectedCurve.endPointId
+        ] ?? null
+      : null
+
+  const selectedCurveStartScreen =
+    selectedCurveStartPoint
+      ? worldToScreen(
+          selectedCurveStartPoint,
+          viewport,
+        )
+      : null
+
+  const selectedCurveEndScreen =
+    selectedCurveEndPoint
+      ? worldToScreen(
+          selectedCurveEndPoint,
+          viewport,
+        )
+      : null
+
+  const selectedControl1Screen =
+    selectedCurve
+      ? worldToScreen(
+          selectedCurve.control1,
+          viewport,
+        )
+      : null
+
+  const selectedControl2Screen =
+    selectedCurve
+      ? worldToScreen(
+          selectedCurve.control2,
+          viewport,
+        )
       : null
 
   useEffect(() => {
@@ -315,18 +430,19 @@ export function CadCanvas({
       return
     }
 
-    const updateCanvasSize = () => {
-      const rect =
-        svg.getBoundingClientRect()
+    const updateCanvasSize =
+      () => {
+        const rect =
+          svg.getBoundingClientRect()
 
-      setCanvasSize({
-        widthPx:
-          rect.width,
+        setCanvasSize({
+          widthPx:
+            rect.width,
 
-        heightPx:
-          rect.height,
-      })
-    }
+          heightPx:
+            rect.height,
+        })
+      }
 
     updateCanvasSize()
 
@@ -347,18 +463,43 @@ export function CadCanvas({
       return
     }
 
-    const stillExists =
-      selection.kind === 'point'
-        ? Boolean(
-            document.points[
-              selection.id
-            ],
-          )
-        : Boolean(
-            document.lines[
-              selection.id
-            ],
-          )
+    let stillExists = false
+
+    if (
+      selection.kind ===
+      'point'
+    ) {
+      stillExists =
+        Boolean(
+          document.points[
+            selection.id
+          ],
+        )
+    }
+
+    if (
+      selection.kind ===
+      'line'
+    ) {
+      stillExists =
+        Boolean(
+          document.lines[
+            selection.id
+          ],
+        )
+    }
+
+    if (
+      selection.kind ===
+      'curve'
+    ) {
+      stillExists =
+        Boolean(
+          document.curves[
+            selection.id
+          ],
+        )
+    }
 
     if (!stillExists) {
       setSelection(null)
@@ -384,8 +525,24 @@ export function CadCanvas({
   ])
 
   useEffect(() => {
+    if (
+      curveStartPointId !== null &&
+      !document.points[
+        curveStartPointId
+      ]
+    ) {
+      setCurveStartPointId(null)
+      setCurveToolMessage(null)
+    }
+  }, [
+    document,
+    curveStartPointId,
+  ])
+
+  useEffect(() => {
     const startExists =
-      measureStartPointId === null ||
+      measureStartPointId ===
+        null ||
       Boolean(
         document.points[
           measureStartPointId
@@ -393,7 +550,8 @@ export function CadCanvas({
       )
 
     const endExists =
-      measureEndPointId === null ||
+      measureEndPointId ===
+        null ||
       Boolean(
         document.points[
           measureEndPointId
@@ -404,9 +562,17 @@ export function CadCanvas({
       !startExists ||
       !endExists
     ) {
-      setMeasureStartPointId(null)
-      setMeasureEndPointId(null)
-      setMeasureToolMessage(null)
+      setMeasureStartPointId(
+        null,
+      )
+
+      setMeasureEndPointId(
+        null,
+      )
+
+      setMeasureToolMessage(
+        null,
+      )
     }
   }, [
     document,
@@ -416,7 +582,8 @@ export function CadCanvas({
 
   useEffect(() => {
     if (
-      selection?.kind !== 'point'
+      selection?.kind !==
+      'point'
     ) {
       setCoordinateXInput('')
       setCoordinateYInput('')
@@ -544,7 +711,7 @@ export function CadCanvas({
   const getLocalScreenPosition = (
     clientX: number,
     clientY: number,
-  ) => {
+  ): ScreenPosition | null => {
     const svg =
       svgRef.current
 
@@ -584,6 +751,12 @@ export function CadCanvas({
       setLineToolMessage(null)
     }
 
+  const clearCurveOperation =
+    () => {
+      setCurveStartPointId(null)
+      setCurveToolMessage(null)
+    }
+
   const clearMeasurement =
     () => {
       setMeasureStartPointId(null)
@@ -591,13 +764,70 @@ export function CadCanvas({
       setMeasureToolMessage(null)
     }
 
+  const clearTransientOperations =
+    () => {
+      clearLineOperation()
+      clearCurveOperation()
+      clearMeasurement()
+    }
+
   const activateTool = (
     tool: ActiveTool,
   ) => {
     setActiveTool(tool)
+    clearTransientOperations()
+  }
 
-    clearLineOperation()
-    clearMeasurement()
+  const findSelectedCurveHandle = (
+    screenPosition:
+      ScreenPosition,
+  ): CurveControlHandle | null => {
+    if (
+      selection?.kind !==
+        'curve' ||
+      !selectedCurve ||
+      !selectedControl1Screen ||
+      !selectedControl2Screen
+    ) {
+      return null
+    }
+
+    const distanceToControl1 =
+      screenDistancePx(
+        screenPosition,
+        selectedControl1Screen,
+      )
+
+    const distanceToControl2 =
+      screenDistancePx(
+        screenPosition,
+        selectedControl2Screen,
+      )
+
+    const control1Hit =
+      distanceToControl1 <=
+      CURVE_HANDLE_HIT_TOLERANCE_PX
+
+    const control2Hit =
+      distanceToControl2 <=
+      CURVE_HANDLE_HIT_TOLERANCE_PX
+
+    if (
+      control1Hit &&
+      (
+        !control2Hit ||
+        distanceToControl1 <=
+          distanceToControl2
+      )
+    ) {
+      return 'control1'
+    }
+
+    if (control2Hit) {
+      return 'control2'
+    }
+
+    return null
   }
 
   const handleMouseMove = (
@@ -606,7 +836,7 @@ export function CadCanvas({
   ) => {
     if (
       isPanning ||
-      isDraggingPoint
+      isDraggingGeometry
     ) {
       return
     }
@@ -715,7 +945,8 @@ export function CadCanvas({
         hit?.kind !== 'point'
       ) {
         setLineToolMessage(
-          lineStartPointId === null
+          lineStartPointId ===
+            null
             ? 'Click a point to start the line.'
             : 'Click a point to finish the line.',
         )
@@ -781,13 +1012,100 @@ export function CadCanvas({
     }
 
     /*
+     * CURVE TOOL
+     *
+     * A new curve starts as a straight
+     * cubic Bezier between two existing
+     * points.
+     */
+    if (
+      activeTool === 'curve'
+    ) {
+      const hit =
+        findSelectionAtScreenPoint(
+          document,
+          viewport,
+          screenPosition,
+        )
+
+      if (
+        hit?.kind !== 'point'
+      ) {
+        setCurveToolMessage(
+          curveStartPointId ===
+            null
+            ? 'Click a point to start the curve.'
+            : 'Click a point to finish the curve.',
+        )
+
+        return
+      }
+
+      if (
+        curveStartPointId === null
+      ) {
+        setCurveStartPointId(
+          hit.id,
+        )
+
+        setSelection({
+          kind: 'point',
+          id: hit.id,
+        })
+
+        setCurveToolMessage(
+          `Curve start: ${hit.id}. Click another point. Esc cancels.`,
+        )
+
+        return
+      }
+
+      if (
+        hit.id ===
+        curveStartPointId
+      ) {
+        setCurveToolMessage(
+          'A curve needs two different endpoint points.',
+        )
+
+        return
+      }
+
+      try {
+        const result =
+          createCurveBetweenPoints(
+            document,
+            curveStartPointId,
+            hit.id,
+          )
+
+        onDocumentChange(
+          result.document,
+        )
+
+        setSelection({
+          kind: 'curve',
+          id: result.curveId,
+        })
+
+        clearCurveOperation()
+      } catch {
+        setCurveToolMessage(
+          'Could not create that curve.',
+        )
+      }
+
+      return
+    }
+
+    /*
      * MEASURE TOOL
      *
      * Measurement is read-only.
-     * It never calls onDocumentChange.
      */
     if (
-      activeTool === 'measure'
+      activeTool ===
+      'measure'
     ) {
       const hit =
         findSelectionAtScreenPoint(
@@ -800,7 +1118,8 @@ export function CadCanvas({
         hit?.kind !== 'point'
       ) {
         setMeasureToolMessage(
-          measureStartPointId === null
+          measureStartPointId ===
+            null
             ? 'Click a point to start measuring.'
             : 'Click a point to finish measuring.',
         )
@@ -808,14 +1127,11 @@ export function CadCanvas({
         return
       }
 
-      /*
-       * If there is no start point,
-       * or a measurement has already
-       * completed, begin a fresh one.
-       */
       if (
-        measureStartPointId === null ||
-        measureEndPointId !== null
+        measureStartPointId ===
+          null ||
+        measureEndPointId !==
+          null
       ) {
         setMeasureStartPointId(
           hit.id,
@@ -857,7 +1173,8 @@ export function CadCanvas({
      * SELECT TOOL
      */
     if (
-      activeTool !== 'select'
+      activeTool !==
+      'select'
     ) {
       return
     }
@@ -878,7 +1195,7 @@ export function CadCanvas({
     event.preventDefault()
 
     if (
-      isDraggingPoint ||
+      isDraggingGeometry ||
       isPanning
     ) {
       return
@@ -915,10 +1232,8 @@ export function CadCanvas({
   const startPan = (
     event:
       PointerEvent<SVGSVGElement>,
-    screenPosition: {
-      xPx: number
-      yPx: number
-    },
+    screenPosition:
+      ScreenPosition,
   ) => {
     event.preventDefault()
 
@@ -975,6 +1290,46 @@ export function CadCanvas({
     setIsDraggingPoint(true)
   }
 
+  const startCurveHandleDrag = (
+    event:
+      PointerEvent<SVGSVGElement>,
+    curveId: string,
+    handle:
+      CurveControlHandle,
+  ) => {
+    event.preventDefault()
+
+    curveHandleDragRef.current = {
+      pointerId:
+        event.pointerId,
+
+      curveId,
+
+      handle,
+    }
+
+    dragPreviewRef.current =
+      document
+
+    setDragPreviewDocument(
+      document,
+    )
+
+    setSelection({
+      kind: 'curve',
+      id: curveId,
+    })
+
+    event.currentTarget
+      .setPointerCapture(
+        event.pointerId,
+      )
+
+    setIsDraggingCurveHandle(
+      true,
+    )
+  }
+
   const handlePointerDown = (
     event:
       PointerEvent<SVGSVGElement>,
@@ -989,6 +1344,9 @@ export function CadCanvas({
       return
     }
 
+    /*
+     * Middle mouse always pans.
+     */
     if (event.button === 1) {
       startPan(
         event,
@@ -998,6 +1356,9 @@ export function CadCanvas({
       return
     }
 
+    /*
+     * Left mouse pans in Pan mode.
+     */
     if (
       activeTool === 'pan' &&
       event.button === 0
@@ -1010,6 +1371,10 @@ export function CadCanvas({
       return
     }
 
+    /*
+     * Point and curve-handle dragging
+     * are only available in Select.
+     */
     if (
       activeTool === 'select' &&
       event.button === 0
@@ -1020,6 +1385,25 @@ export function CadCanvas({
           screenPosition.yPx,
         )
       ) {
+        return
+      }
+
+      const handle =
+        findSelectedCurveHandle(
+          screenPosition,
+        )
+
+      if (
+        handle !== null &&
+        selection?.kind ===
+          'curve'
+      ) {
+        startCurveHandleDrag(
+          event,
+          selection.id,
+          handle,
+        )
+
         return
       }
 
@@ -1167,6 +1551,80 @@ export function CadCanvas({
     return true
   }
 
+  const handleCurvePointerMove = (
+    event:
+      PointerEvent<SVGSVGElement>,
+  ) => {
+    const drag =
+      curveHandleDragRef.current
+
+    if (
+      !drag ||
+      drag.pointerId !==
+        event.pointerId
+    ) {
+      return false
+    }
+
+    event.preventDefault()
+
+    const screenPosition =
+      getLocalScreenPosition(
+        event.clientX,
+        event.clientY,
+      )
+
+    if (!screenPosition) {
+      return true
+    }
+
+    const worldPosition =
+      screenToWorld(
+        screenPosition,
+        viewport,
+      )
+
+    const preview =
+      moveCurveControlToWorldPosition(
+        document,
+        drag.curveId,
+        drag.handle,
+        worldPosition,
+        {
+          snapSpacingMm,
+        },
+      )
+
+    dragPreviewRef.current =
+      preview
+
+    setDragPreviewDocument(
+      preview,
+    )
+
+    const curve =
+      preview.curves[
+        drag.curveId
+      ]
+
+    if (curve) {
+      const control =
+        curve[
+          drag.handle
+        ]
+
+      setCursorWorld({
+        xMm:
+          control.xMm,
+
+        yMm:
+          control.yMm,
+      })
+    }
+
+    return true
+  }
+
   const handlePointerMove = (
     event:
       PointerEvent<SVGSVGElement>,
@@ -1179,7 +1637,15 @@ export function CadCanvas({
       return
     }
 
-    handlePointPointerMove(
+    if (
+      handlePointPointerMove(
+        event,
+      )
+    ) {
+      return
+    }
+
+    handleCurvePointerMove(
       event,
     )
   }
@@ -1283,6 +1749,66 @@ export function CadCanvas({
     return true
   }
 
+  const finishCurveHandleDrag = (
+    event:
+      PointerEvent<SVGSVGElement>,
+  ) => {
+    const drag =
+      curveHandleDragRef.current
+
+    if (
+      !drag ||
+      drag.pointerId !==
+        event.pointerId
+    ) {
+      return false
+    }
+
+    const preview =
+      dragPreviewRef.current
+
+    const changed =
+      preview !== null &&
+      preview !== document
+
+    curveHandleDragRef.current =
+      null
+
+    dragPreviewRef.current =
+      null
+
+    setDragPreviewDocument(
+      null,
+    )
+
+    setIsDraggingCurveHandle(
+      false,
+    )
+
+    /*
+     * The handle itself is not a normal
+     * selectable CAD object, so suppress
+     * the click generated after the drag.
+     */
+    suppressNextClickRef.current =
+      true
+
+    releasePointerCapture(
+      event,
+    )
+
+    if (
+      changed &&
+      preview !== null
+    ) {
+      onDocumentChange(
+        preview,
+      )
+    }
+
+    return true
+  }
+
   const handlePointerUp = (
     event:
       PointerEvent<SVGSVGElement>,
@@ -1293,7 +1819,15 @@ export function CadCanvas({
       return
     }
 
-    finishPointDrag(event)
+    if (
+      finishPointDrag(event)
+    ) {
+      return
+    }
+
+    finishCurveHandleDrag(
+      event,
+    )
   }
 
   const handlePointerCancel = (
@@ -1323,17 +1857,32 @@ export function CadCanvas({
       pointDragRef.current =
         null
 
-      dragPreviewRef.current =
-        null
-
-      setDragPreviewDocument(
-        null,
-      )
-
       setIsDraggingPoint(
         false,
       )
     }
+
+    const curveDrag =
+      curveHandleDragRef.current
+
+    if (
+      curveDrag?.pointerId ===
+      event.pointerId
+    ) {
+      curveHandleDragRef.current =
+        null
+
+      setIsDraggingCurveHandle(
+        false,
+      )
+    }
+
+    dragPreviewRef.current =
+      null
+
+    setDragPreviewDocument(
+      null,
+    )
 
     releasePointerCapture(
       event,
@@ -1350,7 +1899,7 @@ export function CadCanvas({
     }
 
     if (
-      isDraggingPoint ||
+      isDraggingGeometry ||
       isPanning
     ) {
       return
@@ -1379,23 +1928,27 @@ export function CadCanvas({
     )
   }
 
-  const applyZoomInput = () => {
-    const value =
-      Number(zoomInput)
+  const applyZoomInput =
+    () => {
+      const value =
+        Number(zoomInput)
 
-    if (
-      zoomInput.trim() === '' ||
-      !Number.isFinite(value)
-    ) {
-      setZoomInput(
-        String(zoomPercent),
-      )
+      if (
+        zoomInput.trim() ===
+          '' ||
+        !Number.isFinite(value)
+      ) {
+        setZoomInput(
+          String(
+            zoomPercent,
+          ),
+        )
 
-      return
+        return
+      }
+
+      setZoomPercent(value)
     }
-
-    setZoomPercent(value)
-  }
 
   const handleZoomKeyDown = (
     event:
@@ -1406,19 +1959,20 @@ export function CadCanvas({
     ) {
       applyZoomInput()
 
-      event.currentTarget
-        .blur()
+      event.currentTarget.blur()
     }
 
     if (
-      event.key === 'Escape'
+      event.key ===
+      'Escape'
     ) {
       setZoomInput(
-        String(zoomPercent),
+        String(
+          zoomPercent,
+        ),
       )
 
-      event.currentTarget
-        .blur()
+      event.currentTarget.blur()
     }
   }
 
@@ -1455,7 +2009,7 @@ export function CadCanvas({
         selection?.kind !==
           'point' ||
         !selectedPoint ||
-        isDraggingPoint
+        isDraggingGeometry
       ) {
         return
       }
@@ -1565,12 +2119,12 @@ export function CadCanvas({
     }
 
     if (
-      event.key === 'Escape'
+      event.key ===
+      'Escape'
     ) {
       resetCoordinateInputs()
 
-      event.currentTarget
-        .blur()
+      event.currentTarget.blur()
     }
   }
 
@@ -1578,7 +2132,7 @@ export function CadCanvas({
     () => {
       if (
         selection === null ||
-        isDraggingPoint
+        isDraggingGeometry
       ) {
         return
       }
@@ -1594,34 +2148,13 @@ export function CadCanvas({
       )
 
       setSelection(null)
-
-      if (
-        selection.kind ===
-          'point' &&
-        selection.id ===
-          lineStartPointId
-      ) {
-        clearLineOperation()
-      }
-
-      if (
-        selection.kind ===
-          'point' &&
-        (
-          selection.id ===
-            measureStartPointId ||
-          selection.id ===
-            measureEndPointId
-        )
-      ) {
-        clearMeasurement()
-      }
+      clearTransientOperations()
     }
 
   const handleUndo = () => {
     if (
       !canUndo ||
-      isDraggingPoint ||
+      isDraggingGeometry ||
       isPanning
     ) {
       return
@@ -1630,14 +2163,13 @@ export function CadCanvas({
     onUndo()
 
     setSelection(null)
-    clearLineOperation()
-    clearMeasurement()
+    clearTransientOperations()
   }
 
   const handleRedo = () => {
     if (
       !canRedo ||
-      isDraggingPoint ||
+      isDraggingGeometry ||
       isPanning
     ) {
       return
@@ -1646,8 +2178,7 @@ export function CadCanvas({
     onRedo()
 
     setSelection(null)
-    clearLineOperation()
-    clearMeasurement()
+    clearTransientOperations()
   }
 
   useEffect(() => {
@@ -1656,7 +2187,7 @@ export function CadCanvas({
         globalThis.KeyboardEvent,
     ) => {
       if (
-        isDraggingPoint ||
+        isDraggingGeometry ||
         isPanning
       ) {
         return
@@ -1668,8 +2199,8 @@ export function CadCanvas({
         )
 
       /*
-       * ESC cancels line/measurement
-       * operations without editing
+       * ESC cancels unfinished
+       * operations without changing
        * the PatternDocument.
        */
       if (
@@ -1685,6 +2216,20 @@ export function CadCanvas({
           event.preventDefault()
 
           clearLineOperation()
+          setSelection(null)
+
+          return
+        }
+
+        if (
+          activeTool ===
+            'curve' &&
+          curveStartPointId !==
+            null
+        ) {
+          event.preventDefault()
+
+          clearCurveOperation()
           setSelection(null)
 
           return
@@ -1748,8 +2293,7 @@ export function CadCanvas({
         onUndo()
 
         setSelection(null)
-        clearLineOperation()
-        clearMeasurement()
+        clearTransientOperations()
 
         return
       }
@@ -1766,8 +2310,7 @@ export function CadCanvas({
         onRedo()
 
         setSelection(null)
-        clearLineOperation()
-        clearMeasurement()
+        clearTransientOperations()
 
         return
       }
@@ -1794,29 +2337,8 @@ export function CadCanvas({
           nextDocument,
         )
 
-        if (
-          selection.kind ===
-            'point' &&
-          selection.id ===
-            lineStartPointId
-        ) {
-          clearLineOperation()
-        }
-
-        if (
-          selection.kind ===
-            'point' &&
-          (
-            selection.id ===
-              measureStartPointId ||
-            selection.id ===
-              measureEndPointId
-          )
-        ) {
-          clearMeasurement()
-        }
-
         setSelection(null)
+        clearTransientOperations()
       }
     }
 
@@ -1840,16 +2362,17 @@ export function CadCanvas({
     document,
     selection,
     onDocumentChange,
-    isDraggingPoint,
+    isDraggingGeometry,
     isPanning,
     lineStartPointId,
+    curveStartPointId,
     measureStartPointId,
     measureEndPointId,
   ])
 
   const canvasCursor =
     isPanning ||
-    isDraggingPoint
+    isDraggingGeometry
       ? 'grabbing'
       : activeTool === 'pan'
         ? 'grab'
@@ -1858,23 +2381,47 @@ export function CadCanvas({
             activeTool ===
               'line' ||
             activeTool ===
+              'curve' ||
+            activeTool ===
               'measure'
           ? 'crosshair'
           : 'default'
 
-  const selectedDescription =
-    selection === null
-      ? '—'
-      : selection.kind ===
-          'point'
-        ? `Point ${selection.id}`
-        : `Line ${selection.id}`
+  let selectedDescription =
+    '—'
+
+  if (
+    selection?.kind ===
+    'point'
+  ) {
+    selectedDescription =
+      `Point ${selection.id}`
+  }
+
+  if (
+    selection?.kind ===
+    'line'
+  ) {
+    selectedDescription =
+      `Line ${selection.id}`
+  }
+
+  if (
+    selection?.kind ===
+    'curve'
+  ) {
+    selectedDescription =
+      `Curve ${selection.id}`
+  }
 
   const dragDescription =
     isDraggingPoint &&
     pointDragRef.current
       ? `Moving Point ${pointDragRef.current.pointId}`
-      : null
+      : isDraggingCurveHandle &&
+          curveHandleDragRef.current
+        ? `Moving ${curveHandleDragRef.current.handle} of Curve ${curveHandleDragRef.current.curveId}`
+        : null
 
   /*
    * LINE PREVIEW
@@ -1898,6 +2445,34 @@ export function CadCanvas({
   const linePreviewEnd =
     cursorWorld &&
     lineStartPoint
+      ? worldToScreen(
+          cursorWorld,
+          viewport,
+        )
+      : null
+
+  /*
+   * CURVE CREATION PREVIEW
+   */
+
+  const curveStartPoint =
+    curveStartPointId === null
+      ? null
+      : displayDocument.points[
+          curveStartPointId
+        ] ?? null
+
+  const curvePreviewStart =
+    curveStartPoint
+      ? worldToScreen(
+          curveStartPoint,
+          viewport,
+        )
+      : null
+
+  const curvePreviewEnd =
+    cursorWorld &&
+    curveStartPoint
       ? worldToScreen(
           cursorWorld,
           viewport,
@@ -1993,7 +2568,7 @@ export function CadCanvas({
         onMouseLeave={() => {
           if (
             !isPanning &&
-            !isDraggingPoint
+            !isDraggingGeometry
           ) {
             setCursorWorld(null)
           }
@@ -2020,6 +2595,9 @@ export function CadCanvas({
           pointDragRef.current =
             null
 
+          curveHandleDragRef.current =
+            null
+
           dragPreviewRef.current =
             null
 
@@ -2028,8 +2606,9 @@ export function CadCanvas({
           )
 
           setIsPanning(false)
+          setIsDraggingPoint(false)
 
-          setIsDraggingPoint(
+          setIsDraggingCurveHandle(
             false,
           )
         }}
@@ -2124,7 +2703,7 @@ export function CadCanvas({
           )}
         </g>
 
-        {/* REAL PATTERN LINES */}
+        {/* STRAIGHT PATTERN LINES */}
 
         {Object.values(
           displayDocument.lines,
@@ -2185,7 +2764,84 @@ export function CadCanvas({
           )
         })}
 
-        {/* TEMPORARY LINE PREVIEW */}
+        {/* CUBIC BEZIER CURVES */}
+
+        {Object.values(
+          displayDocument.curves,
+        ).map((curve) => {
+          const startPoint =
+            displayDocument.points[
+              curve.startPointId
+            ]
+
+          const endPoint =
+            displayDocument.points[
+              curve.endPointId
+            ]
+
+          if (
+            !startPoint ||
+            !endPoint
+          ) {
+            return null
+          }
+
+          const start =
+            worldToScreen(
+              startPoint,
+              viewport,
+            )
+
+          const control1 =
+            worldToScreen(
+              curve.control1,
+              viewport,
+            )
+
+          const control2 =
+            worldToScreen(
+              curve.control2,
+              viewport,
+            )
+
+          const end =
+            worldToScreen(
+              endPoint,
+              viewport,
+            )
+
+          const isSelected =
+            selection?.kind ===
+              'curve' &&
+            selection.id ===
+              curve.id
+
+          const path =
+            `M ${start.xPx} ${start.yPx} ` +
+            `C ${control1.xPx} ${control1.yPx}, ` +
+            `${control2.xPx} ${control2.yPx}, ` +
+            `${end.xPx} ${end.yPx}`
+
+          return (
+            <path
+              key={curve.id}
+              d={path}
+              fill="none"
+              stroke={
+                isSelected
+                  ? '#2563eb'
+                  : '#111111'
+              }
+              strokeWidth={
+                isSelected
+                  ? 4
+                  : 2
+              }
+            />
+          )
+        })}
+
+        {/* LINE CREATION PREVIEW */}
 
         {activeTool ===
           'line' &&
@@ -2211,7 +2867,33 @@ export function CadCanvas({
             />
           )}
 
-        {/* COMPLETED MEASUREMENT GUIDE */}
+        {/* CURVE CREATION PREVIEW */}
+
+        {activeTool ===
+          'curve' &&
+          curvePreviewStart &&
+          curvePreviewEnd && (
+            <line
+              x1={
+                curvePreviewStart.xPx
+              }
+              y1={
+                curvePreviewStart.yPx
+              }
+              x2={
+                curvePreviewEnd.xPx
+              }
+              y2={
+                curvePreviewEnd.yPx
+              }
+              stroke="#2563eb"
+              strokeWidth={2}
+              strokeDasharray="4 5"
+              pointerEvents="none"
+            />
+          )}
+
+        {/* COMPLETED MEASUREMENT */}
 
         {activeTool ===
           'measure' &&
@@ -2264,6 +2946,110 @@ export function CadCanvas({
             />
           )}
 
+        {/* SELECTED CURVE CONTROL HANDLES */}
+
+        {selectedCurve &&
+          selectedCurveStartScreen &&
+          selectedCurveEndScreen &&
+          selectedControl1Screen &&
+          selectedControl2Screen && (
+            <g
+              pointerEvents="none"
+            >
+              <line
+                x1={
+                  selectedCurveStartScreen.xPx
+                }
+                y1={
+                  selectedCurveStartScreen.yPx
+                }
+                x2={
+                  selectedControl1Screen.xPx
+                }
+                y2={
+                  selectedControl1Screen.yPx
+                }
+                stroke="#2563eb"
+                strokeWidth={1}
+                strokeDasharray="4 3"
+              />
+
+              <line
+                x1={
+                  selectedCurveEndScreen.xPx
+                }
+                y1={
+                  selectedCurveEndScreen.yPx
+                }
+                x2={
+                  selectedControl2Screen.xPx
+                }
+                y2={
+                  selectedControl2Screen.yPx
+                }
+                stroke="#2563eb"
+                strokeWidth={1}
+                strokeDasharray="4 3"
+              />
+
+              <circle
+                cx={
+                  selectedControl1Screen.xPx
+                }
+                cy={
+                  selectedControl1Screen.yPx
+                }
+                r={7}
+                fill="white"
+                stroke="#2563eb"
+                strokeWidth={2}
+              />
+
+              <circle
+                cx={
+                  selectedControl2Screen.xPx
+                }
+                cy={
+                  selectedControl2Screen.yPx
+                }
+                r={7}
+                fill="white"
+                stroke="#2563eb"
+                strokeWidth={2}
+              />
+
+              <text
+                x={
+                  selectedControl1Screen.xPx +
+                  10
+                }
+                y={
+                  selectedControl1Screen.yPx -
+                  8
+                }
+                fontSize="11"
+                fill="#2563eb"
+              >
+                Ctrl 1
+              </text>
+
+              <text
+                x={
+                  selectedControl2Screen.xPx +
+                  10
+                }
+                y={
+                  selectedControl2Screen.yPx -
+                  8
+                }
+                fontSize="11"
+                fill="#2563eb"
+              >
+                Ctrl 2
+              </text>
+            </g>
+          )}
+
         {/* PATTERN POINTS */}
 
         {Object.values(
@@ -2285,6 +3071,12 @@ export function CadCanvas({
             activeTool ===
               'line' &&
             lineStartPointId ===
+              point.id
+
+          const isCurveStart =
+            activeTool ===
+              'curve' &&
+            curveStartPointId ===
               point.id
 
           const isMeasureStart =
@@ -2310,6 +3102,18 @@ export function CadCanvas({
                   stroke="#2563eb"
                   strokeWidth={2}
                   strokeDasharray="3 2"
+                />
+              )}
+
+              {isCurveStart && (
+                <circle
+                  cx={screen.xPx}
+                  cy={screen.yPx}
+                  r={12}
+                  fill="none"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  strokeDasharray="2 2"
                 />
               )}
 
@@ -2353,7 +3157,8 @@ export function CadCanvas({
                 r={5}
                 fill={
                   isSelected ||
-                  isLineStart
+                  isLineStart ||
+                  isCurveStart
                     ? '#2563eb'
                     : 'black'
                 }
@@ -2542,7 +3347,7 @@ export function CadCanvas({
           )}
         </g>
 
-        {/* TOP LEFT CORNER */}
+        {/* TOP-LEFT CORNER */}
 
         <rect
           x={0}
@@ -2629,9 +3434,23 @@ export function CadCanvas({
           'line' && (
             <strong>
               {lineToolMessage ??
-                (lineStartPointId
-                  ? `Line start: ${lineStartPointId} — choose endpoint`
-                  : 'Line: click a start point')}
+                (
+                  lineStartPointId
+                    ? `Line start: ${lineStartPointId} — choose endpoint`
+                    : 'Line: click a start point'
+                )}
+            </strong>
+          )}
+
+        {activeTool ===
+          'curve' && (
+            <strong>
+              {curveToolMessage ??
+                (
+                  curveStartPointId
+                    ? `Curve start: ${curveStartPointId} — choose endpoint`
+                    : 'Curve: click a start point'
+                )}
             </strong>
           )}
 
@@ -2699,7 +3518,8 @@ export function CadCanvas({
             }}
           >
             <strong>
-              Point {selectedPoint.name}
+              Point{' '}
+              {selectedPoint.name}
             </strong>
 
             <label>
@@ -2771,7 +3591,7 @@ export function CadCanvas({
             <button
               type="button"
               disabled={
-                isDraggingPoint
+                isDraggingGeometry
               }
               onClick={
                 applyExactPointPosition
@@ -2811,7 +3631,7 @@ export function CadCanvas({
             type="button"
             disabled={
               !canUndo ||
-              isDraggingPoint
+              isDraggingGeometry
             }
             onClick={
               handleUndo
@@ -2825,7 +3645,7 @@ export function CadCanvas({
             type="button"
             disabled={
               !canRedo ||
-              isDraggingPoint
+              isDraggingGeometry
             }
             onClick={
               handleRedo
@@ -2846,7 +3666,7 @@ export function CadCanvas({
                 'select',
               )
             }}
-            title="Select and move points"
+            title="Select and edit geometry"
             style={{
               fontWeight:
                 activeTool ===
@@ -2892,7 +3712,7 @@ export function CadCanvas({
                 'line',
               )
             }}
-            title="Create a line between two existing points"
+            title="Create a straight line between two points"
             style={{
               fontWeight:
                 activeTool ===
@@ -2902,6 +3722,29 @@ export function CadCanvas({
             }}
           >
             Line
+          </button>
+
+          <button
+            type="button"
+            aria-pressed={
+              activeTool ===
+              'curve'
+            }
+            onClick={() => {
+              activateTool(
+                'curve',
+              )
+            }}
+            title="Create a cubic Bezier curve between two points"
+            style={{
+              fontWeight:
+                activeTool ===
+                'curve'
+                  ? 'bold'
+                  : 'normal',
+            }}
+          >
+            Curve
           </button>
 
           <button
@@ -2954,7 +3797,7 @@ export function CadCanvas({
             type="button"
             disabled={
               selection === null ||
-              isDraggingPoint
+              isDraggingGeometry
             }
             onClick={
               handleDeleteSelection
