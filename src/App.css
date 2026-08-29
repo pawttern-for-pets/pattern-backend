@@ -24,4 +24,13 @@
   flex: 1;
   padding: 20px;
   overflow: hidden;
+}.unitControl {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.unitControl select {
+  padding: 5px 8px;
 }

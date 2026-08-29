@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import './App.css'
 
 import { CadCanvas } from './components/CadCanvas'
@@ -7,6 +9,10 @@ import {
   addPoint,
   createEmptyDocument,
 } from './cad/document'
+
+import type {
+  DisplayUnit,
+} from './cad/display'
 
 function createDemoPattern() {
   let document = createEmptyDocument()
@@ -38,15 +44,43 @@ function createDemoPattern() {
 const demoPattern = createDemoPattern()
 
 function App() {
+  const [displayUnit, setDisplayUnit] =
+    useState<DisplayUnit>('cm')
+
   return (
     <div className="app">
       <header className="header">
         <strong>PAWTTERN CAD</strong>
+
         <span>Foundation v0.1</span>
+
+        <label className="unitControl">
+          Units
+
+          <select
+            value={displayUnit}
+            onChange={(event) => {
+              setDisplayUnit(
+                event.target.value as DisplayUnit,
+              )
+            }}
+          >
+            <option value="cm">
+              Centimeters (cm)
+            </option>
+
+            <option value="in">
+              Inches (in)
+            </option>
+          </select>
+        </label>
       </header>
 
       <main className="workspace">
-        <CadCanvas document={demoPattern} />
+        <CadCanvas
+          document={demoPattern}
+          unit={displayUnit}
+        />
       </main>
     </div>
   )

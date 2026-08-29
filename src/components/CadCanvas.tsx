@@ -7,6 +7,11 @@ import {
 import type { PatternDocument } from '../cad/document'
 
 import {
+  getGridSpacingMm,
+  type DisplayUnit,
+} from '../cad/display'
+
+import {
   getGridPositionsMm,
   getVisibleWorldBounds,
 } from '../cad/grid'
@@ -22,6 +27,7 @@ import {
 
 interface CadCanvasProps {
   document: PatternDocument
+  unit: DisplayUnit
 }
 
 interface CanvasSize {
@@ -33,6 +39,7 @@ const RULER_SIZE_PX = 32
 
 export function CadCanvas({
   document,
+  unit,
 }: CadCanvasProps) {
   const svgRef =
     useRef<SVGSVGElement | null>(null)
@@ -80,14 +87,17 @@ export function CadCanvas({
     }
   }, [])
 
+  const gridSpacingMm =
+    getGridSpacingMm(unit)
+
   let verticalGridMm: number[] = []
   let horizontalGridMm: number[] = []
 
   let horizontalRulerTicks =
-    getRulerTicks(0, 0, 'cm')
+    getRulerTicks(0, 0, unit)
 
   let verticalRulerTicks =
-    getRulerTicks(0, 0, 'cm')
+    getRulerTicks(0, 0, unit)
 
   if (
     canvasSize.widthPx > 0 &&
@@ -104,28 +114,28 @@ export function CadCanvas({
       getGridPositionsMm(
         bounds.minXMm,
         bounds.maxXMm,
-        10,
+        gridSpacingMm,
       )
 
     horizontalGridMm =
       getGridPositionsMm(
         bounds.minYMm,
         bounds.maxYMm,
-        10,
+        gridSpacingMm,
       )
 
     horizontalRulerTicks =
       getRulerTicks(
         bounds.minXMm,
         bounds.maxXMm,
-        'cm',
+        unit,
       )
 
     verticalRulerTicks =
       getRulerTicks(
         bounds.minYMm,
         bounds.maxYMm,
-        'cm',
+        unit,
       )
   }
 
@@ -283,12 +293,8 @@ export function CadCanvas({
             />
 
             <text
-              x={
-                screen.xPx + 10
-              }
-              y={
-                screen.yPx - 10
-              }
+              x={screen.xPx + 10}
+              y={screen.yPx - 10}
               fontSize="16"
             >
               {point.name}
@@ -301,9 +307,7 @@ export function CadCanvas({
       <rect
         x={0}
         y={0}
-        width={
-          canvasSize.widthPx
-        }
+        width={canvasSize.widthPx}
         height={RULER_SIZE_PX}
         fill="#f5f5f5"
         stroke="#cccccc"
@@ -314,9 +318,7 @@ export function CadCanvas({
         x={0}
         y={0}
         width={RULER_SIZE_PX}
-        height={
-          canvasSize.heightPx
-        }
+        height={canvasSize.heightPx}
         fill="#f5f5f5"
         stroke="#cccccc"
       />
@@ -354,27 +356,19 @@ export function CadCanvas({
                     tickHeight
                   }
                   x2={screen.xPx}
-                  y2={
-                    RULER_SIZE_PX
-                  }
+                  y2={RULER_SIZE_PX}
                   stroke="#555555"
                   strokeWidth="1"
                 />
 
-                {tick.label !==
-                  null && (
+                {tick.label !== null && (
                   <text
-                    x={
-                      screen.xPx +
-                      3
-                    }
+                    x={screen.xPx + 3}
                     y={12}
                     fontSize="10"
                     fill="#333333"
                   >
-                    {
-                      tick.label
-                    }
+                    {tick.label}
                   </text>
                 )}
               </g>
@@ -415,28 +409,20 @@ export function CadCanvas({
                     tickWidth
                   }
                   y1={screen.yPx}
-                  x2={
-                    RULER_SIZE_PX
-                  }
+                  x2={RULER_SIZE_PX}
                   y2={screen.yPx}
                   stroke="#555555"
                   strokeWidth="1"
                 />
 
-                {tick.label !==
-                  null && (
+                {tick.label !== null && (
                   <text
                     x={3}
-                    y={
-                      screen.yPx -
-                      3
-                    }
+                    y={screen.yPx - 3}
                     fontSize="10"
                     fill="#333333"
                   >
-                    {
-                      tick.label
-                    }
+                    {tick.label}
                   </text>
                 )}
               </g>
@@ -462,7 +448,7 @@ export function CadCanvas({
         fontWeight="bold"
         fill="#333333"
       >
-        cm
+        {unit}
       </text>
     </svg>
   )
