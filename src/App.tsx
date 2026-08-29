@@ -39,18 +39,27 @@ function createDemoPattern() {
   return document
 }
 
-const demoPattern = createDemoPattern()
-
 function App() {
-  const [displayUnit, setDisplayUnit] =
-    useState<DisplayUnit>('cm')
+  const [
+    displayUnit,
+    setDisplayUnit,
+  ] = useState<DisplayUnit>('cm')
+
+  const [
+    patternDocument,
+    setPatternDocument,
+  ] = useState(createDemoPattern)
 
   return (
     <div className="app">
       <header className="header">
-        <strong>PAWTTERN CAD</strong>
+        <strong>
+          PAWTTERN CAD
+        </strong>
 
-        <span>Foundation v0.1</span>
+        <span>
+          Foundation v0.1
+        </span>
 
         <label className="unitControl">
           Units
@@ -76,8 +85,11 @@ function App() {
 
       <main className="workspace">
         <CadCanvas
-          document={demoPattern}
+          document={patternDocument}
           unit={displayUnit}
+          onDocumentChange={
+            setPatternDocument
+          }
         />
       </main>
     </div>

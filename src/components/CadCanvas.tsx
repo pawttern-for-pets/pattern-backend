@@ -18,6 +18,10 @@ import {
 } from '../cad/display'
 
 import {
+  deleteSelection,
+} from '../cad/editing'
+
+import {
   getGridPositionsMm,
   getVisibleWorldBounds,
 } from '../cad/grid'
@@ -53,6 +57,10 @@ import {
 interface CadCanvasProps {
   document: PatternDocument
   unit: DisplayUnit
+
+  onDocumentChange: (
+    document: PatternDocument,
+  ) => void
 }
 
 interface CanvasSize {
@@ -76,6 +84,7 @@ const ZOOM_FACTOR = 1.15
 export function CadCanvas({
   document,
   unit,
+  onDocumentChange,
 }: CadCanvasProps) {
   const svgRef =
     useRef<SVGSVGElement | null>(null)
@@ -83,11 +92,13 @@ export function CadCanvas({
   const panDragRef =
     useRef<PanDragState | null>(null)
 
-  const [canvasSize, setCanvasSize] =
-    useState<CanvasSize>({
-      widthPx: 0,
-      heightPx: 0,
-    })
+  const [
+    canvasSize,
+    setCanvasSize,
+  ] = useState<CanvasSize>({
+    widthPx: 0,
+    heightPx: 0,
+  })
 
   const [
     cursorWorld,
@@ -115,14 +126,16 @@ export function CadCanvas({
     setIsPanning,
   ] = useState(false)
 
-  const [viewport, setViewport] =
-    useState(() =>
-      createViewport(
-        1,
-        120,
-        120,
-      ),
-    )
+  const [
+    viewport,
+    setViewport,
+  ] = useState(() =>
+    createViewport(
+      1,
+      120,
+      120,
+    ),
+  )
 
   const zoomPercent =
     Math.round(
@@ -304,13 +317,14 @@ export function CadCanvas({
     event: MouseEvent<SVGSVGElement>,
   ) => {
     if (
-      activeTool !==
-      'select'
+      activeTool !== 'select'
     ) {
       return
     }
 
-    if (event.button !== 0) {
+    if (
+      event.button !== 0
+    ) {
       return
     }
 
@@ -518,9 +532,7 @@ export function CadCanvas({
     percent: number,
   ) => {
     if (
-      !Number.isFinite(
-        percent,
-      )
+      !Number.isFinite(percent)
     ) {
       return
     }
@@ -553,14 +565,11 @@ export function CadCanvas({
       Number(zoomInput)
 
     if (
-      zoomInput.trim() ===
-        '' ||
+      zoomInput.trim() === '' ||
       !Number.isFinite(value)
     ) {
       setZoomInput(
-        String(
-          zoomPercent,
-        ),
+        String(zoomPercent),
       )
 
       return
@@ -570,11 +579,11 @@ export function CadCanvas({
   }
 
   const handleZoomKeyDown = (
-    event: KeyboardEvent<HTMLInputElement>,
+    event:
+      KeyboardEvent<HTMLInputElement>,
   ) => {
     if (
-      event.key ===
-      'Enter'
+      event.key === 'Enter'
     ) {
       applyZoomInput()
 
@@ -583,19 +592,37 @@ export function CadCanvas({
     }
 
     if (
-      event.key ===
-      'Escape'
+      event.key === 'Escape'
     ) {
       setZoomInput(
-        String(
-          zoomPercent,
-        ),
+        String(zoomPercent),
       )
 
       event.currentTarget
         .blur()
     }
   }
+
+  const handleDeleteSelection =
+    () => {
+      if (
+        selection === null
+      ) {
+        return
+      }
+
+      const nextDocument =
+        deleteSelection(
+          document,
+          selection,
+        )
+
+      onDocumentChange(
+        nextDocument,
+      )
+
+      setSelection(null)
+    }
 
   const canvasCursor =
     isPanning
@@ -616,14 +643,9 @@ export function CadCanvas({
   return (
     <div
       style={{
-        position:
-          'relative',
-
-        width:
-          '100%',
-
-        height:
-          '100%',
+        position: 'relative',
+        width: '100%',
+        height: '100%',
       }}
     >
       <svg
@@ -638,9 +660,7 @@ export function CadCanvas({
         }
         onMouseLeave={() => {
           if (!isPanning) {
-            setCursorWorld(
-              null,
-            )
+            setCursorWorld(null)
           }
         }}
         onWheel={
@@ -662,26 +682,15 @@ export function CadCanvas({
           panDragRef.current =
             null
 
-          setIsPanning(
-            false,
-          )
+          setIsPanning(false)
         }}
         style={{
-          display:
-            'block',
-
-          background:
-            'white',
-
+          display: 'block',
+          background: 'white',
           border:
             '1px solid #cccccc',
-
-          touchAction:
-            'none',
-
-          userSelect:
-            'none',
-
+          touchAction: 'none',
+          userSelect: 'none',
           cursor:
             canvasCursor,
         }}
@@ -706,13 +715,9 @@ export function CadCanvas({
               return (
                 <line
                   key={`grid-x-${xMm}`}
-                  x1={
-                    screen.xPx
-                  }
+                  x1={screen.xPx}
                   y1={0}
-                  x2={
-                    screen.xPx
-                  }
+                  x2={screen.xPx}
                   y2={
                     canvasSize.heightPx
                   }
@@ -749,15 +754,11 @@ export function CadCanvas({
                 <line
                   key={`grid-y-${yMm}`}
                   x1={0}
-                  y1={
-                    screen.yPx
-                  }
+                  y1={screen.yPx}
                   x2={
                     canvasSize.widthPx
                   }
-                  y2={
-                    screen.yPx
-                  }
+                  y2={screen.yPx}
                   stroke={
                     isOrigin
                       ? '#b0b0b0'
@@ -853,9 +854,7 @@ export function CadCanvas({
               point.id
 
           return (
-            <g
-              key={point.id}
-            >
+            <g key={point.id}>
               {isSelected && (
                 <circle
                   cx={
@@ -943,7 +942,6 @@ export function CadCanvas({
                   {
                     xMm:
                       tick.positionMm,
-
                     yMm: 0,
                   },
                   viewport,
@@ -972,16 +970,12 @@ export function CadCanvas({
                   key={`ruler-x-${tick.positionMm}`}
                 >
                   <line
-                    x1={
-                      screen.xPx
-                    }
+                    x1={screen.xPx}
                     y1={
                       RULER_SIZE_PX -
                       tickHeight
                     }
-                    x2={
-                      screen.xPx
-                    }
+                    x2={screen.xPx}
                     y2={
                       RULER_SIZE_PX
                     }
@@ -997,9 +991,7 @@ export function CadCanvas({
                       y={12}
                       fontSize="10"
                     >
-                      {
-                        tick.label
-                      }
+                      {tick.label}
                     </text>
                   )}
                 </g>
@@ -1017,7 +1009,6 @@ export function CadCanvas({
                 worldToScreen(
                   {
                     xMm: 0,
-
                     yMm:
                       tick.positionMm,
                   },
@@ -1051,15 +1042,11 @@ export function CadCanvas({
                       RULER_SIZE_PX -
                       tickWidth
                     }
-                    y1={
-                      screen.yPx
-                    }
+                    y1={screen.yPx}
                     x2={
                       RULER_SIZE_PX
                     }
-                    y2={
-                      screen.yPx
-                    }
+                    y2={screen.yPx}
                     stroke="#555555"
                   />
 
@@ -1072,9 +1059,7 @@ export function CadCanvas({
                       }
                       fontSize="10"
                     >
-                      {
-                        tick.label
-                      }
+                      {tick.label}
                     </text>
                   )}
                 </g>
@@ -1112,36 +1097,20 @@ export function CadCanvas({
 
       <div
         style={{
-          position:
-            'absolute',
-
+          position: 'absolute',
           left: 0,
           right: 0,
           bottom: 0,
-
-          minHeight:
-            '32px',
-
-          display:
-            'flex',
-
-          alignItems:
-            'center',
-
-          gap:
-            '16px',
-
-          padding:
-            '3px 12px',
-
+          minHeight: '32px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px',
+          padding: '3px 12px',
           background:
             'rgba(245,245,245,0.97)',
-
           borderTop:
             '1px solid #cccccc',
-
-          fontSize:
-            '12px',
+          fontSize: '12px',
         }}
       >
         <span>
@@ -1173,21 +1142,12 @@ export function CadCanvas({
           {selectedDescription}
         </span>
 
-        {/* NAVIGATION / TOOL CONTROLS */}
-
         <div
           style={{
-            marginLeft:
-              'auto',
-
-            display:
-              'flex',
-
-            alignItems:
-              'center',
-
-            gap:
-              '8px',
+            marginLeft: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}
         >
           <button
@@ -1254,16 +1214,32 @@ export function CadCanvas({
             Pan
           </button>
 
+          <button
+            type="button"
+            disabled={
+              selection === null
+            }
+            onClick={
+              handleDeleteSelection
+            }
+            title={
+              selection === null
+                ? 'Select an object first'
+                : `Delete ${selectedDescription}`
+            }
+            style={{
+              padding:
+                '2px 8px',
+            }}
+          >
+            Delete
+          </button>
+
           <div
             style={{
-              display:
-                'flex',
-
-              alignItems:
-                'center',
-
-              gap:
-                '5px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
             }}
           >
             <span>
@@ -1288,9 +1264,7 @@ export function CadCanvas({
               min="10"
               max="1000"
               step="10"
-              value={
-                zoomInput
-              }
+              value={zoomInput}
               onChange={(
                 event,
               ) => {
@@ -1307,20 +1281,15 @@ export function CadCanvas({
               }
               aria-label="Zoom percentage"
               style={{
-                width:
-                  '65px',
-
+                width: '65px',
                 textAlign:
                   'right',
-
                 padding:
                   '2px 4px',
               }}
             />
 
-            <span>
-              %
-            </span>
+            <span>%</span>
 
             <button
               type="button"
