@@ -32,6 +32,10 @@ import {
 } from '../cad/curveEditing'
 
 import {
+  getCurveProperties,
+} from '../cad/curveProperties'
+
+import {
   formatLength,
   getGridSpacingMm,
   getSnapSpacingMm,
@@ -326,6 +330,10 @@ export function CadCanvas({
     setZoomInput,
   ] = useState('100')
 
+  /*
+   * Exact point editor
+   */
+
   const [
     coordinateXInput,
     setCoordinateXInput,
@@ -339,6 +347,37 @@ export function CadCanvas({
   const [
     coordinateError,
     setCoordinateError,
+  ] = useState<string | null>(
+    null,
+  )
+
+  /*
+   * Exact curve control editor
+   */
+
+  const [
+    control1XInput,
+    setControl1XInput,
+  ] = useState('')
+
+  const [
+    control1YInput,
+    setControl1YInput,
+  ] = useState('')
+
+  const [
+    control2XInput,
+    setControl2XInput,
+  ] = useState('')
+
+  const [
+    control2YInput,
+    setControl2YInput,
+  ] = useState('')
+
+  const [
+    curveControlError,
+    setCurveControlError,
   ] = useState<string | null>(
     null,
   )
@@ -415,6 +454,27 @@ export function CadCanvas({
           viewport,
         )
       : null
+
+  let selectedCurveProperties:
+    ReturnType<
+      typeof getCurveProperties
+    > | null = null
+
+  if (
+    selection?.kind === 'curve'
+  ) {
+    try {
+      selectedCurveProperties =
+        getCurveProperties(
+          displayDocument,
+          selection.id,
+          200,
+        )
+    } catch {
+      selectedCurveProperties =
+        null
+    }
+  }
 
   useEffect(() => {
     setZoomInput(
@@ -580,6 +640,10 @@ export function CadCanvas({
     measureEndPointId,
   ])
 
+  /*
+   * Sync exact point inputs.
+   */
+
   useEffect(() => {
     if (
       selection?.kind !==
@@ -624,6 +688,82 @@ export function CadCanvas({
     )
 
     setCoordinateError(null)
+  }, [
+    selection,
+    document,
+    unit,
+  ])
+
+  /*
+   * Sync exact curve control inputs.
+   */
+
+  useEffect(() => {
+    if (
+      selection?.kind !==
+      'curve'
+    ) {
+      setControl1XInput('')
+      setControl1YInput('')
+      setControl2XInput('')
+      setControl2YInput('')
+      setCurveControlError(null)
+
+      return
+    }
+
+    const curve =
+      document.curves[
+        selection.id
+      ]
+
+    if (!curve) {
+      setControl1XInput('')
+      setControl1YInput('')
+      setControl2XInput('')
+      setControl2YInput('')
+      setCurveControlError(null)
+
+      return
+    }
+
+    const control1Display =
+      worldCoordinatesToDisplay(
+        curve.control1,
+        unit,
+      )
+
+    const control2Display =
+      worldCoordinatesToDisplay(
+        curve.control2,
+        unit,
+      )
+
+    setControl1XInput(
+      formatCoordinateInput(
+        control1Display.x,
+      ),
+    )
+
+    setControl1YInput(
+      formatCoordinateInput(
+        control1Display.y,
+      ),
+    )
+
+    setControl2XInput(
+      formatCoordinateInput(
+        control2Display.x,
+      ),
+    )
+
+    setControl2YInput(
+      formatCoordinateInput(
+        control2Display.y,
+      ),
+    )
+
+    setCurveControlError(null)
   }, [
     selection,
     document,
@@ -898,6 +1038,7 @@ export function CadCanvas({
     /*
      * POINT TOOL
      */
+
     if (
       activeTool === 'point'
     ) {
@@ -931,6 +1072,7 @@ export function CadCanvas({
     /*
      * LINE TOOL
      */
+
     if (
       activeTool === 'line'
     ) {
@@ -1013,11 +1155,8 @@ export function CadCanvas({
 
     /*
      * CURVE TOOL
-     *
-     * A new curve starts as a straight
-     * cubic Bezier between two existing
-     * points.
      */
+
     if (
       activeTool === 'curve'
     ) {
@@ -1100,9 +1239,8 @@ export function CadCanvas({
 
     /*
      * MEASURE TOOL
-     *
-     * Measurement is read-only.
      */
+
     if (
       activeTool ===
       'measure'
@@ -1172,6 +1310,7 @@ export function CadCanvas({
     /*
      * SELECT TOOL
      */
+
     if (
       activeTool !==
       'select'
@@ -1344,9 +1483,6 @@ export function CadCanvas({
       return
     }
 
-    /*
-     * Middle mouse always pans.
-     */
     if (event.button === 1) {
       startPan(
         event,
@@ -1356,9 +1492,6 @@ export function CadCanvas({
       return
     }
 
-    /*
-     * Left mouse pans in Pan mode.
-     */
     if (
       activeTool === 'pan' &&
       event.button === 0
@@ -1371,10 +1504,6 @@ export function CadCanvas({
       return
     }
 
-    /*
-     * Point and curve-handle dragging
-     * are only available in Select.
-     */
     if (
       activeTool === 'select' &&
       event.button === 0
@@ -1785,11 +1914,6 @@ export function CadCanvas({
       false,
     )
 
-    /*
-     * The handle itself is not a normal
-     * selectable CAD object, so suppress
-     * the click generated after the drag.
-     */
     suppressNextClickRef.current =
       true
 
@@ -1976,6 +2100,10 @@ export function CadCanvas({
     }
   }
 
+  /*
+   * Exact point coordinate editing
+   */
+
   const resetCoordinateInputs =
     () => {
       if (!selectedPoint) {
@@ -2069,9 +2197,14 @@ export function CadCanvas({
             },
           )
 
-        onDocumentChange(
-          nextDocument,
-        )
+        if (
+          nextDocument !==
+          document
+        ) {
+          onDocumentChange(
+            nextDocument,
+          )
+        }
 
         const nextPoint =
           nextDocument.points[
@@ -2128,6 +2261,234 @@ export function CadCanvas({
     }
   }
 
+  /*
+   * Exact curve control editing
+   */
+
+  const resetCurveControlInputs =
+    () => {
+      if (
+        selection?.kind !==
+          'curve'
+      ) {
+        return
+      }
+
+      const curve =
+        document.curves[
+          selection.id
+        ]
+
+      if (!curve) {
+        return
+      }
+
+      const control1Display =
+        worldCoordinatesToDisplay(
+          curve.control1,
+          unit,
+        )
+
+      const control2Display =
+        worldCoordinatesToDisplay(
+          curve.control2,
+          unit,
+        )
+
+      setControl1XInput(
+        formatCoordinateInput(
+          control1Display.x,
+        ),
+      )
+
+      setControl1YInput(
+        formatCoordinateInput(
+          control1Display.y,
+        ),
+      )
+
+      setControl2XInput(
+        formatCoordinateInput(
+          control2Display.x,
+        ),
+      )
+
+      setControl2YInput(
+        formatCoordinateInput(
+          control2Display.y,
+        ),
+      )
+
+      setCurveControlError(null)
+    }
+
+  const applyExactCurveControl = (
+    handle:
+      CurveControlHandle,
+  ) => {
+    if (
+      selection?.kind !==
+        'curve' ||
+      isDraggingGeometry
+    ) {
+      return
+    }
+
+    const xInput =
+      handle === 'control1'
+        ? control1XInput
+        : control2XInput
+
+    const yInput =
+      handle === 'control1'
+        ? control1YInput
+        : control2YInput
+
+    if (
+      xInput.trim() === '' ||
+      yInput.trim() === ''
+    ) {
+      setCurveControlError(
+        'Enter both X and Y.',
+      )
+
+      return
+    }
+
+    const x =
+      Number(xInput)
+
+    const y =
+      Number(yInput)
+
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y)
+    ) {
+      setCurveControlError(
+        'Control coordinates must be valid numbers.',
+      )
+
+      return
+    }
+
+    try {
+      const worldPosition =
+        displayCoordinatesToWorld(
+          {
+            x,
+            y,
+          },
+          unit,
+        )
+
+      const nextDocument =
+        moveCurveControlToWorldPosition(
+          document,
+          selection.id,
+          handle,
+          worldPosition,
+          {
+            /*
+             * Exact numeric input
+             * deliberately bypasses
+             * mouse snapping.
+             */
+            snapSpacingMm:
+              null,
+          },
+        )
+
+      if (
+        nextDocument !==
+        document
+      ) {
+        onDocumentChange(
+          nextDocument,
+        )
+      }
+
+      const nextCurve =
+        nextDocument.curves[
+          selection.id
+        ]
+
+      if (nextCurve) {
+        const control =
+          nextCurve[
+            handle
+          ]
+
+        const displayed =
+          worldCoordinatesToDisplay(
+            control,
+            unit,
+          )
+
+        if (
+          handle ===
+          'control1'
+        ) {
+          setControl1XInput(
+            formatCoordinateInput(
+              displayed.x,
+            ),
+          )
+
+          setControl1YInput(
+            formatCoordinateInput(
+              displayed.y,
+            ),
+          )
+        } else {
+          setControl2XInput(
+            formatCoordinateInput(
+              displayed.x,
+            ),
+          )
+
+          setControl2YInput(
+            formatCoordinateInput(
+              displayed.y,
+            ),
+          )
+        }
+      }
+
+      setCurveControlError(null)
+    } catch {
+      setCurveControlError(
+        'Could not apply that control position.',
+      )
+    }
+  }
+
+  const handleCurveControlKeyDown = (
+    event:
+      ReactKeyboardEvent<HTMLInputElement>,
+    handle:
+      CurveControlHandle,
+  ) => {
+    if (
+      event.key === 'Enter'
+    ) {
+      applyExactCurveControl(
+        handle,
+      )
+
+      return
+    }
+
+    if (
+      event.key ===
+      'Escape'
+    ) {
+      resetCurveControlInputs()
+
+      event.currentTarget.blur()
+    }
+  }
+
   const handleDeleteSelection =
     () => {
       if (
@@ -2143,9 +2504,14 @@ export function CadCanvas({
           selection,
         )
 
-      onDocumentChange(
-        nextDocument,
-      )
+      if (
+        nextDocument !==
+        document
+      ) {
+        onDocumentChange(
+          nextDocument,
+        )
+      }
 
       setSelection(null)
       clearTransientOperations()
@@ -2198,11 +2564,6 @@ export function CadCanvas({
           event.target,
         )
 
-      /*
-       * ESC cancels unfinished
-       * operations without changing
-       * the PatternDocument.
-       */
       if (
         !editable &&
         event.key === 'Escape'
@@ -2333,9 +2694,14 @@ export function CadCanvas({
             selection,
           )
 
-        onDocumentChange(
-          nextDocument,
-        )
+        if (
+          nextDocument !==
+          document
+        ) {
+          onDocumentChange(
+            nextDocument,
+          )
+        }
 
         setSelection(null)
         clearTransientOperations()
@@ -3347,7 +3713,7 @@ export function CadCanvas({
           )}
         </g>
 
-        {/* TOP-LEFT CORNER */}
+        {/* TOP LEFT CORNER */}
 
         <rect
           x={0}
@@ -3371,6 +3737,346 @@ export function CadCanvas({
           {unit}
         </text>
       </svg>
+
+      {/* CURVE PROPERTIES PANEL */}
+
+      {selection?.kind ===
+        'curve' &&
+        selectedCurveProperties && (
+          <div
+            style={{
+              position:
+                'absolute',
+              top: '44px',
+              right: '14px',
+              width: '300px',
+              padding: '12px',
+              background:
+                'rgba(255,255,255,0.97)',
+              border:
+                '1px solid #bdbdbd',
+              borderRadius:
+                '4px',
+              boxShadow:
+                '0 2px 8px rgba(0,0,0,0.12)',
+              fontSize: '12px',
+              zIndex: 10,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent:
+                  'space-between',
+                alignItems:
+                  'center',
+                marginBottom:
+                  '8px',
+              }}
+            >
+              <strong
+                style={{
+                  fontSize:
+                    '14px',
+                }}
+              >
+                Curve{' '}
+                {
+                  selectedCurveProperties
+                    .name
+                }
+              </strong>
+
+              <span>
+                {unit}
+              </span>
+            </div>
+
+            <div
+              style={{
+                marginBottom:
+                  '5px',
+              }}
+            >
+              From:{' '}
+              <strong>
+                {
+                  selectedCurveProperties
+                    .startPointId
+                }
+              </strong>
+              {' → '}
+              <strong>
+                {
+                  selectedCurveProperties
+                    .endPointId
+                }
+              </strong>
+            </div>
+
+            <div
+              style={{
+                marginBottom:
+                  '10px',
+                paddingBottom:
+                  '8px',
+                borderBottom:
+                  '1px solid #dddddd',
+              }}
+            >
+              Length:{' '}
+              <strong>
+                {formatLength(
+                  selectedCurveProperties
+                    .lengthMm,
+                  unit,
+                )}
+              </strong>
+            </div>
+
+            <div
+              style={{
+                marginBottom:
+                  '10px',
+              }}
+            >
+              <strong>
+                Ctrl 1
+              </strong>
+
+              <div
+                style={{
+                  display:
+                    'flex',
+                  gap: '5px',
+                  alignItems:
+                    'center',
+                  marginTop:
+                    '4px',
+                }}
+              >
+                <label>
+                  X{' '}
+                  <input
+                    type="number"
+                    step="any"
+                    value={
+                      control1XInput
+                    }
+                    onChange={(
+                      event,
+                    ) => {
+                      setControl1XInput(
+                        event
+                          .target
+                          .value,
+                      )
+
+                      setCurveControlError(
+                        null,
+                      )
+                    }}
+                    onKeyDown={(
+                      event,
+                    ) => {
+                      handleCurveControlKeyDown(
+                        event,
+                        'control1',
+                      )
+                    }}
+                    style={{
+                      width:
+                        '70px',
+                    }}
+                  />
+                </label>
+
+                <label>
+                  Y{' '}
+                  <input
+                    type="number"
+                    step="any"
+                    value={
+                      control1YInput
+                    }
+                    onChange={(
+                      event,
+                    ) => {
+                      setControl1YInput(
+                        event
+                          .target
+                          .value,
+                      )
+
+                      setCurveControlError(
+                        null,
+                      )
+                    }}
+                    onKeyDown={(
+                      event,
+                    ) => {
+                      handleCurveControlKeyDown(
+                        event,
+                        'control1',
+                      )
+                    }}
+                    style={{
+                      width:
+                        '70px',
+                    }}
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  disabled={
+                    isDraggingGeometry
+                  }
+                  onClick={() => {
+                    applyExactCurveControl(
+                      'control1',
+                    )
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <strong>
+                Ctrl 2
+              </strong>
+
+              <div
+                style={{
+                  display:
+                    'flex',
+                  gap: '5px',
+                  alignItems:
+                    'center',
+                  marginTop:
+                    '4px',
+                }}
+              >
+                <label>
+                  X{' '}
+                  <input
+                    type="number"
+                    step="any"
+                    value={
+                      control2XInput
+                    }
+                    onChange={(
+                      event,
+                    ) => {
+                      setControl2XInput(
+                        event
+                          .target
+                          .value,
+                      )
+
+                      setCurveControlError(
+                        null,
+                      )
+                    }}
+                    onKeyDown={(
+                      event,
+                    ) => {
+                      handleCurveControlKeyDown(
+                        event,
+                        'control2',
+                      )
+                    }}
+                    style={{
+                      width:
+                        '70px',
+                    }}
+                  />
+                </label>
+
+                <label>
+                  Y{' '}
+                  <input
+                    type="number"
+                    step="any"
+                    value={
+                      control2YInput
+                    }
+                    onChange={(
+                      event,
+                    ) => {
+                      setControl2YInput(
+                        event
+                          .target
+                          .value,
+                      )
+
+                      setCurveControlError(
+                        null,
+                      )
+                    }}
+                    onKeyDown={(
+                      event,
+                    ) => {
+                      handleCurveControlKeyDown(
+                        event,
+                        'control2',
+                      )
+                    }}
+                    style={{
+                      width:
+                        '70px',
+                    }}
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  disabled={
+                    isDraggingGeometry
+                  }
+                  onClick={() => {
+                    applyExactCurveControl(
+                      'control2',
+                    )
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+
+            {curveControlError && (
+              <div
+                style={{
+                  marginTop:
+                    '8px',
+                  color:
+                    '#b00020',
+                }}
+              >
+                {
+                  curveControlError
+                }
+              </div>
+            )}
+
+            <div
+              style={{
+                marginTop:
+                  '9px',
+                color:
+                  '#666666',
+                lineHeight: 1.4,
+              }}
+            >
+              Mouse dragging uses
+              snap. Exact numeric
+              input does not snap.
+            </div>
+          </div>
+        )}
 
       {/* STATUS / TOOL BAR */}
 
