@@ -2,7 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
-  type KeyboardEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
   type PointerEvent,
   type WheelEvent,
@@ -43,6 +43,10 @@ import {
   findSelectionAtScreenPoint,
   type Selection,
 } from '../cad/selection'
+
+import {
+  getCadShortcut,
+} from '../cad/shortcuts'
 
 import {
   createViewport,
@@ -86,6 +90,24 @@ type ActiveTool =
 
 const RULER_SIZE_PX = 32
 const ZOOM_FACTOR = 1.15
+
+function isEditableElement(
+  target: EventTarget | null,
+): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  const tagName =
+    target.tagName.toLowerCase()
+
+  return (
+    tagName === 'input' ||
+    tagName === 'textarea' ||
+    tagName === 'select' ||
+    target.isContentEditable
+  )
+}
 
 export function CadCanvas({
   document,
@@ -199,15 +221,12 @@ export function CadCanvas({
   }, [])
 
   useEffect(() => {
-    if (
-      selection === null
-    ) {
+    if (selection === null) {
       return
     }
 
     const stillExists =
-      selection.kind ===
-      'point'
+      selection.kind === 'point'
         ? Boolean(
             document.points[
               selection.id
@@ -328,8 +347,7 @@ export function CadCanvas({
   }
 
   const handleMouseMove = (
-    event:
-      MouseEvent<SVGSVGElement>,
+    event: MouseEvent<SVGSVGElement>,
   ) => {
     if (isPanning) {
       return
@@ -354,19 +372,15 @@ export function CadCanvas({
   }
 
   const handleCanvasClick = (
-    event:
-      MouseEvent<SVGSVGElement>,
+    event: MouseEvent<SVGSVGElement>,
   ) => {
     if (
-      activeTool !==
-      'select'
+      activeTool !== 'select'
     ) {
       return
     }
 
-    if (
-      event.button !== 0
-    ) {
+    if (event.button !== 0) {
       return
     }
 
@@ -400,8 +414,7 @@ export function CadCanvas({
   }
 
   const handleWheel = (
-    event:
-      WheelEvent<SVGSVGElement>,
+    event: WheelEvent<SVGSVGElement>,
   ) => {
     event.preventDefault()
 
@@ -434,15 +447,13 @@ export function CadCanvas({
   }
 
   const handlePointerDown = (
-    event:
-      PointerEvent<SVGSVGElement>,
+    event: PointerEvent<SVGSVGElement>,
   ) => {
     const useMiddleMouse =
       event.button === 1
 
     const usePanTool =
-      activeTool ===
-        'pan' &&
+      activeTool === 'pan' &&
       event.button === 0
 
     if (
@@ -484,8 +495,7 @@ export function CadCanvas({
   }
 
   const handlePointerMove = (
-    event:
-      PointerEvent<SVGSVGElement>,
+    event: PointerEvent<SVGSVGElement>,
   ) => {
     const drag =
       panDragRef.current
@@ -540,8 +550,7 @@ export function CadCanvas({
   }
 
   const finishPan = (
-    event:
-      PointerEvent<SVGSVGElement>,
+    event: PointerEvent<SVGSVGElement>,
   ) => {
     const drag =
       panDragRef.current
@@ -604,33 +613,30 @@ export function CadCanvas({
     )
   }
 
-  const applyZoomInput =
-    () => {
-      const value =
-        Number(zoomInput)
+  const applyZoomInput = () => {
+    const value =
+      Number(zoomInput)
 
-      if (
-        zoomInput.trim() ===
-          '' ||
-        !Number.isFinite(value)
-      ) {
-        setZoomInput(
-          String(zoomPercent),
-        )
+    if (
+      zoomInput.trim() === '' ||
+      !Number.isFinite(value)
+    ) {
+      setZoomInput(
+        String(zoomPercent),
+      )
 
-        return
-      }
-
-      setZoomPercent(value)
+      return
     }
+
+    setZoomPercent(value)
+  }
 
   const handleZoomKeyDown = (
     event:
-      KeyboardEvent<HTMLInputElement>,
+      ReactKeyboardEvent<HTMLInputElement>,
   ) => {
     if (
-      event.key ===
-      'Enter'
+      event.key === 'Enter'
     ) {
       applyZoomInput()
 
@@ -639,8 +645,7 @@ export function CadCanvas({
     }
 
     if (
-      event.key ===
-      'Escape'
+      event.key === 'Escape'
     ) {
       setZoomInput(
         String(zoomPercent),
@@ -673,20 +678,148 @@ export function CadCanvas({
     }
 
   const handleUndo = () => {
+    if (!canUndo) {
+      return
+    }
+
     onUndo()
     setSelection(null)
   }
 
   const handleRedo = () => {
+    if (!canRedo) {
+      return
+    }
+
     onRedo()
     setSelection(null)
   }
 
+  /*
+   * CAD keyboard shortcuts:
+   *
+   * Ctrl+Z          Undo
+   * Ctrl+Y          Redo
+   * Ctrl+Shift+Z    Redo
+   * Delete          Delete selection
+   *
+   * Inputs/selects are ignored so typing
+   * in the zoom box remains safe.
+   */
+  useEffect(() => {
+    const handleKeyDown = (
+      event: globalThis.KeyboardEvent,
+    ) => {
+      const shortcut =
+        getCadShortcut({
+          key:
+            event.key,
+
+          ctrlKey:
+            event.ctrlKey,
+
+          metaKey:
+            event.metaKey,
+
+          shiftKey:
+            event.shiftKey,
+
+          altKey:
+            event.altKey,
+
+          isEditableTarget:
+            isEditableElement(
+              event.target,
+            ),
+        })
+
+      if (
+        shortcut === null
+      ) {
+        return
+      }
+
+      if (
+        shortcut === 'undo'
+      ) {
+        if (!canUndo) {
+          return
+        }
+
+        event.preventDefault()
+
+        onUndo()
+        setSelection(null)
+
+        return
+      }
+
+      if (
+        shortcut === 'redo'
+      ) {
+        if (!canRedo) {
+          return
+        }
+
+        event.preventDefault()
+
+        onRedo()
+        setSelection(null)
+
+        return
+      }
+
+      if (
+        shortcut ===
+        'delete'
+      ) {
+        if (
+          selection === null
+        ) {
+          return
+        }
+
+        event.preventDefault()
+
+        const nextDocument =
+          deleteSelection(
+            document,
+            selection,
+          )
+
+        onDocumentChange(
+          nextDocument,
+        )
+
+        setSelection(null)
+      }
+    }
+
+    window.addEventListener(
+      'keydown',
+      handleKeyDown,
+    )
+
+    return () => {
+      window.removeEventListener(
+        'keydown',
+        handleKeyDown,
+      )
+    }
+  }, [
+    canUndo,
+    canRedo,
+    onUndo,
+    onRedo,
+    document,
+    selection,
+    onDocumentChange,
+  ])
+
   const canvasCursor =
     isPanning
       ? 'grabbing'
-      : activeTool ===
-          'pan'
+      : activeTool === 'pan'
         ? 'grab'
         : 'default'
 
@@ -952,7 +1085,7 @@ export function CadCanvas({
           )
         })}
 
-        {/* TOP RULER */}
+        {/* TOP RULER BACKGROUND */}
 
         <rect
           x={0}
@@ -967,7 +1100,7 @@ export function CadCanvas({
           stroke="#cccccc"
         />
 
-        {/* LEFT RULER */}
+        {/* LEFT RULER BACKGROUND */}
 
         <rect
           x={0}
@@ -982,7 +1115,7 @@ export function CadCanvas({
           stroke="#cccccc"
         />
 
-        {/* HORIZONTAL RULER TICKS */}
+        {/* HORIZONTAL RULER */}
 
         <g>
           {horizontalRulerTicks.map(
@@ -1050,7 +1183,7 @@ export function CadCanvas({
           )}
         </g>
 
-        {/* VERTICAL RULER TICKS */}
+        {/* VERTICAL RULER */}
 
         <g>
           {verticalRulerTicks.map(
@@ -1208,7 +1341,7 @@ export function CadCanvas({
             }
             title={
               canUndo
-                ? 'Undo last edit'
+                ? 'Undo (Ctrl+Z)'
                 : 'Nothing to undo'
             }
           >
@@ -1223,7 +1356,7 @@ export function CadCanvas({
             }
             title={
               canRedo
-                ? 'Redo last edit'
+                ? 'Redo (Ctrl+Y)'
                 : 'Nothing to redo'
             }
           >
@@ -1245,13 +1378,11 @@ export function CadCanvas({
             style={{
               padding:
                 '2px 8px',
-
               fontWeight:
                 activeTool ===
                 'select'
                   ? 'bold'
                   : 'normal',
-
               background:
                 activeTool ===
                 'select'
@@ -1277,13 +1408,11 @@ export function CadCanvas({
             style={{
               padding:
                 '2px 8px',
-
               fontWeight:
                 activeTool ===
                 'pan'
                   ? 'bold'
                   : 'normal',
-
               background:
                 activeTool ===
                 'pan'
@@ -1305,7 +1434,7 @@ export function CadCanvas({
             title={
               selection === null
                 ? 'Select an object first'
-                : `Delete ${selectedDescription}`
+                : 'Delete selected object (Delete)'
             }
           >
             Delete
@@ -1323,6 +1452,7 @@ export function CadCanvas({
                   10,
               )
             }}
+            title="Zoom out"
           >
             −
           </button>
@@ -1364,6 +1494,7 @@ export function CadCanvas({
                   10,
               )
             }}
+            title="Zoom in"
           >
             +
           </button>
@@ -1375,6 +1506,7 @@ export function CadCanvas({
                 100,
               )
             }}
+            title="Reset zoom to 100%"
           >
             100%
           </button>
