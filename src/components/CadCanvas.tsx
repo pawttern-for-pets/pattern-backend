@@ -33,6 +33,10 @@ import {
 } from '../cad/grid'
 
 import {
+  createLineBetweenPoints,
+} from '../cad/lineCreation'
+
+import {
   movePointToWorldPosition,
 } from '../cad/movement'
 
@@ -106,6 +110,7 @@ interface PointDragState {
 type ActiveTool =
   | 'select'
   | 'point'
+  | 'line'
   | 'pan'
 
 const RULER_SIZE_PX = 32
@@ -188,6 +193,20 @@ export function CadCanvas({
     setActiveTool,
   ] = useState<ActiveTool>(
     'select',
+  )
+
+  const [
+    lineStartPointId,
+    setLineStartPointId,
+  ] = useState<string | null>(
+    null,
+  )
+
+  const [
+    lineToolMessage,
+    setLineToolMessage,
+  ] = useState<string | null>(
+    null,
   )
 
   const [
@@ -321,6 +340,21 @@ export function CadCanvas({
   }, [
     document,
     selection,
+  ])
+
+  useEffect(() => {
+    if (
+      lineStartPointId !== null &&
+      !document.points[
+        lineStartPointId
+      ]
+    ) {
+      setLineStartPointId(null)
+      setLineToolMessage(null)
+    }
+  }, [
+    document,
+    lineStartPointId,
   ])
 
   useEffect(() => {
@@ -487,6 +521,26 @@ export function CadCanvas({
     )
   }
 
+  const cancelUnfinishedLine =
+    () => {
+      setLineStartPointId(null)
+      setLineToolMessage(null)
+
+      if (
+        selection?.kind === 'point'
+      ) {
+        setSelection(null)
+      }
+    }
+
+  const activateTool = (
+    tool: ActiveTool,
+  ) => {
+    setActiveTool(tool)
+    setLineStartPointId(null)
+    setLineToolMessage(null)
+  }
+
   const handleMouseMove = (
     event:
       MouseEvent<SVGSVGElement>,
@@ -554,9 +608,6 @@ export function CadCanvas({
 
     /*
      * POINT TOOL
-     *
-     * One click creates one point and
-     * therefore one history entry.
      */
     if (
       activeTool === 'point'
@@ -584,6 +635,97 @@ export function CadCanvas({
         kind: 'point',
         id: result.pointId,
       })
+
+      return
+    }
+
+    /*
+     * LINE TOOL
+     *
+     * Lines connect existing points.
+     */
+    if (
+      activeTool === 'line'
+    ) {
+      const hit =
+        findSelectionAtScreenPoint(
+          document,
+          viewport,
+          screenPosition,
+        )
+
+      if (
+        hit?.kind !== 'point'
+      ) {
+        setLineToolMessage(
+          lineStartPointId ===
+            null
+            ? 'Click a point to start the line.'
+            : 'Click a point to finish the line.',
+        )
+
+        return
+      }
+
+      if (
+        lineStartPointId === null
+      ) {
+        setLineStartPointId(
+          hit.id,
+        )
+
+        setSelection({
+          kind: 'point',
+          id: hit.id,
+        })
+
+        setLineToolMessage(
+          `Start ${hit.id} selected. Click another point. Esc cancels.`,
+        )
+
+        return
+      }
+
+      if (
+        hit.id ===
+        lineStartPointId
+      ) {
+        setLineToolMessage(
+          'A line needs two different points.',
+        )
+
+        return
+      }
+
+      try {
+        const result =
+          createLineBetweenPoints(
+            document,
+            lineStartPointId,
+            hit.id,
+          )
+
+        onDocumentChange(
+          result.document,
+        )
+
+        setSelection({
+          kind: 'line',
+          id: result.lineId,
+        })
+
+        setLineStartPointId(
+          null,
+        )
+
+        setLineToolMessage(
+          null,
+        )
+      } catch {
+        setLineToolMessage(
+          'Could not create that line.',
+        )
+      }
 
       return
     }
@@ -737,8 +879,7 @@ export function CadCanvas({
     }
 
     /*
-     * Left mouse pans when Pan
-     * tool is active.
+     * Left mouse pans in Pan mode.
      */
     if (
       activeTool === 'pan' &&
@@ -753,11 +894,8 @@ export function CadCanvas({
     }
 
     /*
-     * Point dragging only happens in
-     * Select mode.
-     *
-     * Point tool uses the click event
-     * to create a new point.
+     * Point dragging is only allowed
+     * in Select mode.
      */
     if (
       activeTool === 'select' &&
@@ -1343,6 +1481,21 @@ export function CadCanvas({
       )
 
       setSelection(null)
+
+      if (
+        selection.kind ===
+          'point' &&
+        selection.id ===
+          lineStartPointId
+      ) {
+        setLineStartPointId(
+          null,
+        )
+
+        setLineToolMessage(
+          null,
+        )
+      }
     }
 
   const handleUndo = () => {
@@ -1356,6 +1509,8 @@ export function CadCanvas({
 
     onUndo()
     setSelection(null)
+    setLineStartPointId(null)
+    setLineToolMessage(null)
   }
 
   const handleRedo = () => {
@@ -1369,6 +1524,8 @@ export function CadCanvas({
 
     onRedo()
     setSelection(null)
+    setLineStartPointId(null)
+    setLineToolMessage(null)
   }
 
   useEffect(() => {
@@ -1380,6 +1537,28 @@ export function CadCanvas({
         isDraggingPoint ||
         isPanning
       ) {
+        return
+      }
+
+      const editable =
+        isEditableElement(
+          event.target,
+        )
+
+      /*
+       * ESC cancels an unfinished line.
+       */
+      if (
+        !editable &&
+        event.key ===
+          'Escape' &&
+        lineStartPointId !==
+          null
+      ) {
+        event.preventDefault()
+
+        cancelUnfinishedLine()
+
         return
       }
 
@@ -1401,9 +1580,7 @@ export function CadCanvas({
             event.altKey,
 
           isEditableTarget:
-            isEditableElement(
-              event.target,
-            ),
+            editable,
         })
 
       if (
@@ -1423,6 +1600,8 @@ export function CadCanvas({
 
         onUndo()
         setSelection(null)
+        setLineStartPointId(null)
+        setLineToolMessage(null)
 
         return
       }
@@ -1438,6 +1617,8 @@ export function CadCanvas({
 
         onRedo()
         setSelection(null)
+        setLineStartPointId(null)
+        setLineToolMessage(null)
 
         return
       }
@@ -1464,6 +1645,21 @@ export function CadCanvas({
           nextDocument,
         )
 
+        if (
+          selection.kind ===
+            'point' &&
+          selection.id ===
+            lineStartPointId
+        ) {
+          setLineStartPointId(
+            null,
+          )
+
+          setLineToolMessage(
+            null,
+          )
+        }
+
         setSelection(null)
       }
     }
@@ -1489,6 +1685,7 @@ export function CadCanvas({
     onDocumentChange,
     isDraggingPoint,
     isPanning,
+    lineStartPointId,
   ])
 
   const canvasCursor =
@@ -1497,7 +1694,10 @@ export function CadCanvas({
       ? 'grabbing'
       : activeTool === 'pan'
         ? 'grab'
-        : activeTool === 'point'
+        : activeTool ===
+              'point' ||
+            activeTool ===
+              'line'
           ? 'crosshair'
           : 'default'
 
@@ -1513,6 +1713,30 @@ export function CadCanvas({
     isDraggingPoint &&
     pointDragRef.current
       ? `Moving Point ${pointDragRef.current.pointId}`
+      : null
+
+  const lineStartPoint =
+    lineStartPointId === null
+      ? null
+      : displayDocument.points[
+          lineStartPointId
+        ] ?? null
+
+  const linePreviewStart =
+    lineStartPoint
+      ? worldToScreen(
+          lineStartPoint,
+          viewport,
+        )
+      : null
+
+  const linePreviewEnd =
+    cursorWorld &&
+    lineStartPoint
+      ? worldToScreen(
+          cursorWorld,
+          viewport,
+        )
       : null
 
   return (
@@ -1667,7 +1891,7 @@ export function CadCanvas({
           )}
         </g>
 
-        {/* PATTERN LINES */}
+        {/* REAL PATTERN LINES */}
 
         {Object.values(
           displayDocument.lines,
@@ -1728,6 +1952,32 @@ export function CadCanvas({
           )
         })}
 
+        {/* TEMPORARY LINE PREVIEW */}
+
+        {activeTool ===
+          'line' &&
+          linePreviewStart &&
+          linePreviewEnd && (
+            <line
+              x1={
+                linePreviewStart.xPx
+              }
+              y1={
+                linePreviewStart.yPx
+              }
+              x2={
+                linePreviewEnd.xPx
+              }
+              y2={
+                linePreviewEnd.yPx
+              }
+              stroke="#2563eb"
+              strokeWidth={2}
+              strokeDasharray="7 5"
+              pointerEvents="none"
+            />
+          )}
+
         {/* PATTERN POINTS */}
 
         {Object.values(
@@ -1745,8 +1995,26 @@ export function CadCanvas({
             selection.id ===
               point.id
 
+          const isLineStart =
+            activeTool ===
+              'line' &&
+            lineStartPointId ===
+              point.id
+
           return (
             <g key={point.id}>
+              {isLineStart && (
+                <circle
+                  cx={screen.xPx}
+                  cy={screen.yPx}
+                  r={12}
+                  fill="none"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  strokeDasharray="3 2"
+                />
+              )}
+
               {isSelected && (
                 <circle
                   cx={screen.xPx}
@@ -1763,7 +2031,8 @@ export function CadCanvas({
                 cy={screen.yPx}
                 r={5}
                 fill={
-                  isSelected
+                  isSelected ||
+                  isLineStart
                     ? '#2563eb'
                     : 'black'
                 }
@@ -2035,6 +2304,16 @@ export function CadCanvas({
           )}
         </span>
 
+        {activeTool ===
+          'line' && (
+            <strong>
+              {lineToolMessage ??
+                (lineStartPointId
+                  ? `Line start: ${lineStartPointId} — choose endpoint`
+                  : 'Line: click a start point')}
+            </strong>
+          )}
+
         {selectedPoint && (
           <div
             style={{
@@ -2195,7 +2474,7 @@ export function CadCanvas({
               'select'
             }
             onClick={() => {
-              setActiveTool(
+              activateTool(
                 'select',
               )
             }}
@@ -2218,7 +2497,7 @@ export function CadCanvas({
               'point'
             }
             onClick={() => {
-              setActiveTool(
+              activateTool(
                 'point',
               )
             }}
@@ -2238,10 +2517,33 @@ export function CadCanvas({
             type="button"
             aria-pressed={
               activeTool ===
+              'line'
+            }
+            onClick={() => {
+              activateTool(
+                'line',
+              )
+            }}
+            title="Create a line between two existing points"
+            style={{
+              fontWeight:
+                activeTool ===
+                'line'
+                  ? 'bold'
+                  : 'normal',
+            }}
+          >
+            Line
+          </button>
+
+          <button
+            type="button"
+            aria-pressed={
+              activeTool ===
               'pan'
             }
             onClick={() => {
-              setActiveTool(
+              activateTool(
                 'pan',
               )
             }}
