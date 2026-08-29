@@ -2,10 +2,13 @@ import {
   useEffect,
   useRef,
   useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type WheelEvent,
 } from 'react'
 
-import type { PatternDocument } from '../cad/document'
 import type { WorldPosition } from '../cad/coordinates'
+import type { PatternDocument } from '../cad/document'
 
 import {
   formatLength,
@@ -28,6 +31,10 @@ import {
   worldToScreen,
 } from '../cad/viewport'
 
+import {
+  zoomViewportAtScreenPoint,
+} from '../cad/zoom'
+
 interface CadCanvasProps {
   document: PatternDocument
   unit: DisplayUnit
@@ -39,6 +46,7 @@ interface CanvasSize {
 }
 
 const RULER_SIZE_PX = 32
+const ZOOM_FACTOR = 1.15
 
 export function CadCanvas({
   document,
@@ -60,11 +68,30 @@ export function CadCanvas({
     null,
   )
 
-  const viewport = createViewport(
-    1,
-    120,
-    120,
-  )
+  const [viewport, setViewport] =
+    useState(() =>
+      createViewport(
+        1,
+        120,
+        120,
+      ),
+    )
+
+  const zoomPercent =
+    Math.round(
+      viewport.zoom * 100,
+    )
+
+  const [
+    zoomInput,
+    setZoomInput,
+  ] = useState('100')
+
+  useEffect(() => {
+    setZoomInput(
+      String(zoomPercent),
+    )
+  }, [zoomPercent])
 
   useEffect(() => {
     const svg = svgRef.current
@@ -104,10 +131,18 @@ export function CadCanvas({
   let horizontalGridMm: number[] = []
 
   let horizontalRulerTicks =
-    getRulerTicks(0, 0, unit)
+    getRulerTicks(
+      0,
+      0,
+      unit,
+    )
 
   let verticalRulerTicks =
-    getRulerTicks(0, 0, unit)
+    getRulerTicks(
+      0,
+      0,
+      unit,
+    )
 
   if (
     canvasSize.widthPx > 0 &&
@@ -139,6 +174,7 @@ export function CadCanvas({
         bounds.minXMm,
         bounds.maxXMm,
         unit,
+        20000,
       )
 
     verticalRulerTicks =
@@ -146,13 +182,12 @@ export function CadCanvas({
         bounds.minYMm,
         bounds.maxYMm,
         unit,
+        20000,
       )
   }
 
   const handleMouseMove = (
-    event: React.MouseEvent<
-      SVGSVGElement
-    >,
+    event: MouseEvent<SVGSVGElement>,
   ) => {
     const svg = svgRef.current
 
@@ -165,9 +200,12 @@ export function CadCanvas({
 
     const screenPosition = {
       xPx:
-        event.clientX - rect.left,
+        event.clientX -
+        rect.left,
+
       yPx:
-        event.clientY - rect.top,
+        event.clientY -
+        rect.top,
     }
 
     const worldPosition =
@@ -176,7 +214,117 @@ export function CadCanvas({
         viewport,
       )
 
-    setCursorWorld(worldPosition)
+    setCursorWorld(
+      worldPosition,
+    )
+  }
+
+  const handleWheel = (
+    event: WheelEvent<SVGSVGElement>,
+  ) => {
+    event.preventDefault()
+
+    const svg = svgRef.current
+
+    if (!svg) {
+      return
+    }
+
+    const rect =
+      svg.getBoundingClientRect()
+
+    const anchor = {
+      xPx:
+        event.clientX -
+        rect.left,
+
+      yPx:
+        event.clientY -
+        rect.top,
+    }
+
+    setViewport(
+      (currentViewport) => {
+        const requestedZoom =
+          event.deltaY < 0
+            ? currentViewport.zoom *
+              ZOOM_FACTOR
+            : currentViewport.zoom /
+              ZOOM_FACTOR
+
+        return zoomViewportAtScreenPoint(
+          currentViewport,
+          anchor,
+          requestedZoom,
+        )
+      },
+    )
+  }
+
+  const setZoomPercent = (
+    percent: number,
+  ) => {
+    if (
+      !Number.isFinite(percent)
+    ) {
+      return
+    }
+
+    const requestedZoom =
+      percent / 100
+
+    const anchor = {
+      xPx:
+        canvasSize.widthPx / 2,
+
+      yPx:
+        canvasSize.heightPx / 2,
+    }
+
+    setViewport(
+      (currentViewport) =>
+        zoomViewportAtScreenPoint(
+          currentViewport,
+          anchor,
+          requestedZoom,
+        ),
+    )
+  }
+
+  const applyZoomInput = () => {
+    const value =
+      Number(zoomInput)
+
+    if (
+      zoomInput.trim() === '' ||
+      !Number.isFinite(value)
+    ) {
+      setZoomInput(
+        String(zoomPercent),
+      )
+
+      return
+    }
+
+    setZoomPercent(value)
+  }
+
+  const handleZoomKeyDown = (
+    event: KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (event.key === 'Enter') {
+      applyZoomInput()
+
+      event.currentTarget.blur()
+    }
+
+    if (event.key === 'Escape') {
+      setZoomInput(
+        String(zoomPercent),
+      )
+
+      event.currentTarget.blur()
+    }
   }
 
   return (
@@ -197,14 +345,17 @@ export function CadCanvas({
         onMouseLeave={() => {
           setCursorWorld(null)
         }}
+        onWheel={handleWheel}
         style={{
           display: 'block',
           background: 'white',
           border:
             '1px solid #cccccc',
+          touchAction: 'none',
         }}
       >
         {/* GRID */}
+
         <g>
           {verticalGridMm.map(
             (xMm) => {
@@ -284,6 +435,7 @@ export function CadCanvas({
         </g>
 
         {/* PATTERN LINES */}
+
         {Object.values(
           document.lines,
         ).map((line) => {
@@ -330,6 +482,7 @@ export function CadCanvas({
         })}
 
         {/* PATTERN POINTS */}
+
         {Object.values(
           document.points,
         ).map((point) => {
@@ -349,8 +502,14 @@ export function CadCanvas({
               />
 
               <text
-                x={screen.xPx + 10}
-                y={screen.yPx - 10}
+                x={
+                  screen.xPx +
+                  10
+                }
+                y={
+                  screen.yPx -
+                  10
+                }
                 fontSize="16"
               >
                 {point.name}
@@ -359,23 +518,29 @@ export function CadCanvas({
           )
         })}
 
-        {/* TOP RULER */}
+        {/* TOP RULER BACKGROUND */}
+
         <rect
           x={0}
           y={0}
           width={
             canvasSize.widthPx
           }
-          height={RULER_SIZE_PX}
+          height={
+            RULER_SIZE_PX
+          }
           fill="#f5f5f5"
           stroke="#cccccc"
         />
 
-        {/* LEFT RULER */}
+        {/* LEFT RULER BACKGROUND */}
+
         <rect
           x={0}
           y={0}
-          width={RULER_SIZE_PX}
+          width={
+            RULER_SIZE_PX
+          }
           height={
             canvasSize.heightPx
           }
@@ -384,6 +549,7 @@ export function CadCanvas({
         />
 
         {/* HORIZONTAL RULER */}
+
         <g>
           {horizontalRulerTicks.map(
             (tick) => {
@@ -398,7 +564,8 @@ export function CadCanvas({
                 )
 
               const tickHeight =
-                tick.kind === 'major'
+                tick.kind ===
+                'major'
                   ? 12
                   : tick.kind ===
                       'medium'
@@ -410,12 +577,16 @@ export function CadCanvas({
                   key={`ruler-x-${tick.positionMm}`}
                 >
                   <line
-                    x1={screen.xPx}
+                    x1={
+                      screen.xPx
+                    }
                     y1={
                       RULER_SIZE_PX -
                       tickHeight
                     }
-                    x2={screen.xPx}
+                    x2={
+                      screen.xPx
+                    }
                     y2={
                       RULER_SIZE_PX
                     }
@@ -432,7 +603,9 @@ export function CadCanvas({
                       y={12}
                       fontSize="10"
                     >
-                      {tick.label}
+                      {
+                        tick.label
+                      }
                     </text>
                   )}
                 </g>
@@ -442,6 +615,7 @@ export function CadCanvas({
         </g>
 
         {/* VERTICAL RULER */}
+
         <g>
           {verticalRulerTicks.map(
             (tick) => {
@@ -456,7 +630,8 @@ export function CadCanvas({
                 )
 
               const tickWidth =
-                tick.kind === 'major'
+                tick.kind ===
+                'major'
                   ? 12
                   : tick.kind ===
                       'medium'
@@ -472,11 +647,15 @@ export function CadCanvas({
                       RULER_SIZE_PX -
                       tickWidth
                     }
-                    y1={screen.yPx}
+                    y1={
+                      screen.yPx
+                    }
                     x2={
                       RULER_SIZE_PX
                     }
-                    y2={screen.yPx}
+                    y2={
+                      screen.yPx
+                    }
                     stroke="#555555"
                   />
 
@@ -490,7 +669,9 @@ export function CadCanvas({
                       }
                       fontSize="10"
                     >
-                      {tick.label}
+                      {
+                        tick.label
+                      }
                     </text>
                   )}
                 </g>
@@ -500,11 +681,16 @@ export function CadCanvas({
         </g>
 
         {/* TOP LEFT CORNER */}
+
         <rect
           x={0}
           y={0}
-          width={RULER_SIZE_PX}
-          height={RULER_SIZE_PX}
+          width={
+            RULER_SIZE_PX
+          }
+          height={
+            RULER_SIZE_PX
+          }
           fill="#e8e8e8"
           stroke="#cccccc"
         />
@@ -519,24 +705,24 @@ export function CadCanvas({
         </text>
       </svg>
 
-      {/* CURSOR STATUS */}
+      {/* STATUS BAR */}
+
       <div
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
           bottom: 0,
-          height: '28px',
+          minHeight: '32px',
           display: 'flex',
           alignItems: 'center',
           gap: '24px',
-          padding: '0 12px',
+          padding: '3px 12px',
           background:
-            'rgba(245,245,245,0.95)',
+            'rgba(245,245,245,0.97)',
           borderTop:
             '1px solid #cccccc',
           fontSize: '12px',
-          pointerEvents: 'none',
         }}
       >
         <span>
@@ -562,6 +748,90 @@ export function CadCanvas({
         <span>
           Unit: {unit}
         </span>
+
+        {/* ZOOM CONTROLS */}
+
+        <div
+          style={{
+            marginLeft: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+          }}
+        >
+          <span>
+            Zoom:
+          </span>
+
+          <button
+            type="button"
+            onClick={() => {
+              setZoomPercent(
+                zoomPercent -
+                10,
+              )
+            }}
+            title="Zoom out"
+          >
+            −
+          </button>
+
+          <input
+            type="number"
+            min="10"
+            max="1000"
+            step="10"
+            value={zoomInput}
+            onChange={(
+              event,
+            ) => {
+              setZoomInput(
+                event.target.value,
+              )
+            }}
+            onBlur={
+              applyZoomInput
+            }
+            onKeyDown={
+              handleZoomKeyDown
+            }
+            aria-label="Zoom percentage"
+            style={{
+              width: '65px',
+              textAlign:
+                'right',
+              padding:
+                '2px 4px',
+            }}
+          />
+
+          <span>%</span>
+
+          <button
+            type="button"
+            onClick={() => {
+              setZoomPercent(
+                zoomPercent +
+                10,
+              )
+            }}
+            title="Zoom in"
+          >
+            +
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setZoomPercent(
+                100,
+              )
+            }}
+            title="Reset zoom to 100%"
+          >
+            100%
+          </button>
+        </div>
       </div>
     </div>
   )
