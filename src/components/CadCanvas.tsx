@@ -41,6 +41,10 @@ import {
 } from '../cad/pan'
 
 import {
+  createPointAtWorldPosition,
+} from '../cad/pointCreation'
+
+import {
   getRulerTicks,
 } from '../cad/ruler'
 
@@ -101,6 +105,7 @@ interface PointDragState {
 
 type ActiveTool =
   | 'select'
+  | 'point'
   | 'pan'
 
 const RULER_SIZE_PX = 32
@@ -318,15 +323,6 @@ export function CadCanvas({
     selection,
   ])
 
-  /*
-   * Keep the exact-coordinate editor
-   * synchronized with the selected
-   * committed point.
-   *
-   * Switching cm/in automatically
-   * converts the displayed values
-   * without changing geometry.
-   */
   useEffect(() => {
     if (
       selection?.kind !== 'point'
@@ -533,12 +529,6 @@ export function CadCanvas({
       return
     }
 
-    if (
-      activeTool !== 'select'
-    ) {
-      return
-    }
-
     if (event.button !== 0) {
       return
     }
@@ -558,6 +548,51 @@ export function CadCanvas({
         screenPosition.xPx,
         screenPosition.yPx,
       )
+    ) {
+      return
+    }
+
+    /*
+     * POINT TOOL
+     *
+     * One click creates one point and
+     * therefore one history entry.
+     */
+    if (
+      activeTool === 'point'
+    ) {
+      const worldPosition =
+        screenToWorld(
+          screenPosition,
+          viewport,
+        )
+
+      const result =
+        createPointAtWorldPosition(
+          document,
+          worldPosition,
+          {
+            snapSpacingMm,
+          },
+        )
+
+      onDocumentChange(
+        result.document,
+      )
+
+      setSelection({
+        kind: 'point',
+        id: result.pointId,
+      })
+
+      return
+    }
+
+    /*
+     * SELECT TOOL
+     */
+    if (
+      activeTool !== 'select'
     ) {
       return
     }
@@ -689,6 +724,9 @@ export function CadCanvas({
       return
     }
 
+    /*
+     * Middle mouse always pans.
+     */
     if (event.button === 1) {
       startPan(
         event,
@@ -698,6 +736,10 @@ export function CadCanvas({
       return
     }
 
+    /*
+     * Left mouse pans when Pan
+     * tool is active.
+     */
     if (
       activeTool === 'pan' &&
       event.button === 0
@@ -710,6 +752,13 @@ export function CadCanvas({
       return
     }
 
+    /*
+     * Point dragging only happens in
+     * Select mode.
+     *
+     * Point tool uses the click event
+     * to create a new point.
+     */
     if (
       activeTool === 'select' &&
       event.button === 0
@@ -1204,11 +1253,6 @@ export function CadCanvas({
             unit,
           )
 
-        /*
-         * IMPORTANT:
-         * Exact coordinate entry does
-         * NOT use grid snapping.
-         */
         const nextDocument =
           movePointToWorldPosition(
             document,
@@ -1453,7 +1497,9 @@ export function CadCanvas({
       ? 'grabbing'
       : activeTool === 'pan'
         ? 'grab'
-        : 'default'
+        : activeTool === 'point'
+          ? 'crosshair'
+          : 'default'
 
   const selectedDescription =
     selection === null
@@ -1982,7 +2028,7 @@ export function CadCanvas({
         </span>
 
         <span>
-          Drag snap:{' '}
+          Snap:{' '}
           {formatLength(
             snapSpacingMm,
             unit,
@@ -2081,7 +2127,6 @@ export function CadCanvas({
               onClick={
                 applyExactPointPosition
               }
-              title="Apply exact point position"
             >
               Apply
             </button>
@@ -2155,8 +2200,38 @@ export function CadCanvas({
               )
             }}
             title="Select and move points"
+            style={{
+              fontWeight:
+                activeTool ===
+                'select'
+                  ? 'bold'
+                  : 'normal',
+            }}
           >
             Select
+          </button>
+
+          <button
+            type="button"
+            aria-pressed={
+              activeTool ===
+              'point'
+            }
+            onClick={() => {
+              setActiveTool(
+                'point',
+              )
+            }}
+            title="Create points"
+            style={{
+              fontWeight:
+                activeTool ===
+                'point'
+                  ? 'bold'
+                  : 'normal',
+            }}
+          >
+            Point
           </button>
 
           <button
@@ -2171,6 +2246,13 @@ export function CadCanvas({
               )
             }}
             title="Pan workspace"
+            style={{
+              fontWeight:
+                activeTool ===
+                'pan'
+                  ? 'bold'
+                  : 'normal',
+            }}
           >
             Pan
           </button>
