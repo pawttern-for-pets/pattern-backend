@@ -37,6 +37,10 @@ import {
 } from '../cad/lineCreation'
 
 import {
+  measureBetweenPoints,
+} from '../cad/measurement'
+
+import {
   movePointToWorldPosition,
 } from '../cad/movement'
 
@@ -111,6 +115,7 @@ type ActiveTool =
   | 'select'
   | 'point'
   | 'line'
+  | 'measure'
   | 'pan'
 
 const RULER_SIZE_PX = 32
@@ -205,6 +210,27 @@ export function CadCanvas({
   const [
     lineToolMessage,
     setLineToolMessage,
+  ] = useState<string | null>(
+    null,
+  )
+
+  const [
+    measureStartPointId,
+    setMeasureStartPointId,
+  ] = useState<string | null>(
+    null,
+  )
+
+  const [
+    measureEndPointId,
+    setMeasureEndPointId,
+  ] = useState<string | null>(
+    null,
+  )
+
+  const [
+    measureToolMessage,
+    setMeasureToolMessage,
   ] = useState<string | null>(
     null,
   )
@@ -355,6 +381,37 @@ export function CadCanvas({
   }, [
     document,
     lineStartPointId,
+  ])
+
+  useEffect(() => {
+    const startExists =
+      measureStartPointId === null ||
+      Boolean(
+        document.points[
+          measureStartPointId
+        ],
+      )
+
+    const endExists =
+      measureEndPointId === null ||
+      Boolean(
+        document.points[
+          measureEndPointId
+        ],
+      )
+
+    if (
+      !startExists ||
+      !endExists
+    ) {
+      setMeasureStartPointId(null)
+      setMeasureEndPointId(null)
+      setMeasureToolMessage(null)
+    }
+  }, [
+    document,
+    measureStartPointId,
+    measureEndPointId,
   ])
 
   useEffect(() => {
@@ -521,24 +578,26 @@ export function CadCanvas({
     )
   }
 
-  const cancelUnfinishedLine =
+  const clearLineOperation =
     () => {
       setLineStartPointId(null)
       setLineToolMessage(null)
+    }
 
-      if (
-        selection?.kind === 'point'
-      ) {
-        setSelection(null)
-      }
+  const clearMeasurement =
+    () => {
+      setMeasureStartPointId(null)
+      setMeasureEndPointId(null)
+      setMeasureToolMessage(null)
     }
 
   const activateTool = (
     tool: ActiveTool,
   ) => {
     setActiveTool(tool)
-    setLineStartPointId(null)
-    setLineToolMessage(null)
+
+    clearLineOperation()
+    clearMeasurement()
   }
 
   const handleMouseMove = (
@@ -641,8 +700,6 @@ export function CadCanvas({
 
     /*
      * LINE TOOL
-     *
-     * Lines connect existing points.
      */
     if (
       activeTool === 'line'
@@ -658,8 +715,7 @@ export function CadCanvas({
         hit?.kind !== 'point'
       ) {
         setLineToolMessage(
-          lineStartPointId ===
-            null
+          lineStartPointId === null
             ? 'Click a point to start the line.'
             : 'Click a point to finish the line.',
         )
@@ -714,18 +770,85 @@ export function CadCanvas({
           id: result.lineId,
         })
 
-        setLineStartPointId(
-          null,
-        )
-
-        setLineToolMessage(
-          null,
-        )
+        clearLineOperation()
       } catch {
         setLineToolMessage(
           'Could not create that line.',
         )
       }
+
+      return
+    }
+
+    /*
+     * MEASURE TOOL
+     *
+     * Measurement is read-only.
+     * It never calls onDocumentChange.
+     */
+    if (
+      activeTool === 'measure'
+    ) {
+      const hit =
+        findSelectionAtScreenPoint(
+          document,
+          viewport,
+          screenPosition,
+        )
+
+      if (
+        hit?.kind !== 'point'
+      ) {
+        setMeasureToolMessage(
+          measureStartPointId === null
+            ? 'Click a point to start measuring.'
+            : 'Click a point to finish measuring.',
+        )
+
+        return
+      }
+
+      /*
+       * If there is no start point,
+       * or a measurement has already
+       * completed, begin a fresh one.
+       */
+      if (
+        measureStartPointId === null ||
+        measureEndPointId !== null
+      ) {
+        setMeasureStartPointId(
+          hit.id,
+        )
+
+        setMeasureEndPointId(
+          null,
+        )
+
+        setSelection({
+          kind: 'point',
+          id: hit.id,
+        })
+
+        setMeasureToolMessage(
+          `Measure start: ${hit.id}. Click the second point. Esc cancels.`,
+        )
+
+        return
+      }
+
+      setMeasureEndPointId(
+        hit.id,
+      )
+
+      setSelection({
+        kind: 'point',
+        id: hit.id,
+      })
+
+      setMeasureToolMessage(
+        null,
+      )
 
       return
     }
@@ -866,9 +989,6 @@ export function CadCanvas({
       return
     }
 
-    /*
-     * Middle mouse always pans.
-     */
     if (event.button === 1) {
       startPan(
         event,
@@ -878,9 +998,6 @@ export function CadCanvas({
       return
     }
 
-    /*
-     * Left mouse pans in Pan mode.
-     */
     if (
       activeTool === 'pan' &&
       event.button === 0
@@ -893,10 +1010,6 @@ export function CadCanvas({
       return
     }
 
-    /*
-     * Point dragging is only allowed
-     * in Select mode.
-     */
     if (
       activeTool === 'select' &&
       event.button === 0
@@ -1488,13 +1601,20 @@ export function CadCanvas({
         selection.id ===
           lineStartPointId
       ) {
-        setLineStartPointId(
-          null,
-        )
+        clearLineOperation()
+      }
 
-        setLineToolMessage(
-          null,
+      if (
+        selection.kind ===
+          'point' &&
+        (
+          selection.id ===
+            measureStartPointId ||
+          selection.id ===
+            measureEndPointId
         )
+      ) {
+        clearMeasurement()
       }
     }
 
@@ -1508,9 +1628,10 @@ export function CadCanvas({
     }
 
     onUndo()
+
     setSelection(null)
-    setLineStartPointId(null)
-    setLineToolMessage(null)
+    clearLineOperation()
+    clearMeasurement()
   }
 
   const handleRedo = () => {
@@ -1523,9 +1644,10 @@ export function CadCanvas({
     }
 
     onRedo()
+
     setSelection(null)
-    setLineStartPointId(null)
-    setLineToolMessage(null)
+    clearLineOperation()
+    clearMeasurement()
   }
 
   useEffect(() => {
@@ -1546,20 +1668,45 @@ export function CadCanvas({
         )
 
       /*
-       * ESC cancels an unfinished line.
+       * ESC cancels line/measurement
+       * operations without editing
+       * the PatternDocument.
        */
       if (
         !editable &&
-        event.key ===
-          'Escape' &&
-        lineStartPointId !==
-          null
+        event.key === 'Escape'
       ) {
-        event.preventDefault()
+        if (
+          activeTool ===
+            'line' &&
+          lineStartPointId !==
+            null
+        ) {
+          event.preventDefault()
 
-        cancelUnfinishedLine()
+          clearLineOperation()
+          setSelection(null)
 
-        return
+          return
+        }
+
+        if (
+          activeTool ===
+            'measure' &&
+          (
+            measureStartPointId !==
+              null ||
+            measureEndPointId !==
+              null
+          )
+        ) {
+          event.preventDefault()
+
+          clearMeasurement()
+          setSelection(null)
+
+          return
+        }
       }
 
       const shortcut =
@@ -1599,9 +1746,10 @@ export function CadCanvas({
         event.preventDefault()
 
         onUndo()
+
         setSelection(null)
-        setLineStartPointId(null)
-        setLineToolMessage(null)
+        clearLineOperation()
+        clearMeasurement()
 
         return
       }
@@ -1616,9 +1764,10 @@ export function CadCanvas({
         event.preventDefault()
 
         onRedo()
+
         setSelection(null)
-        setLineStartPointId(null)
-        setLineToolMessage(null)
+        clearLineOperation()
+        clearMeasurement()
 
         return
       }
@@ -1651,13 +1800,20 @@ export function CadCanvas({
           selection.id ===
             lineStartPointId
         ) {
-          setLineStartPointId(
-            null,
-          )
+          clearLineOperation()
+        }
 
-          setLineToolMessage(
-            null,
+        if (
+          selection.kind ===
+            'point' &&
+          (
+            selection.id ===
+              measureStartPointId ||
+            selection.id ===
+              measureEndPointId
           )
+        ) {
+          clearMeasurement()
         }
 
         setSelection(null)
@@ -1676,6 +1832,7 @@ export function CadCanvas({
       )
     }
   }, [
+    activeTool,
     canUndo,
     canRedo,
     onUndo,
@@ -1686,6 +1843,8 @@ export function CadCanvas({
     isDraggingPoint,
     isPanning,
     lineStartPointId,
+    measureStartPointId,
+    measureEndPointId,
   ])
 
   const canvasCursor =
@@ -1697,7 +1856,9 @@ export function CadCanvas({
         : activeTool ===
               'point' ||
             activeTool ===
-              'line'
+              'line' ||
+            activeTool ===
+              'measure'
           ? 'crosshair'
           : 'default'
 
@@ -1714,6 +1875,10 @@ export function CadCanvas({
     pointDragRef.current
       ? `Moving Point ${pointDragRef.current.pointId}`
       : null
+
+  /*
+   * LINE PREVIEW
+   */
 
   const lineStartPoint =
     lineStartPointId === null
@@ -1738,6 +1903,74 @@ export function CadCanvas({
           viewport,
         )
       : null
+
+  /*
+   * MEASUREMENT
+   */
+
+  const measureStartPoint =
+    measureStartPointId === null
+      ? null
+      : displayDocument.points[
+          measureStartPointId
+        ] ?? null
+
+  const measureEndPoint =
+    measureEndPointId === null
+      ? null
+      : displayDocument.points[
+          measureEndPointId
+        ] ?? null
+
+  const measureStartScreen =
+    measureStartPoint
+      ? worldToScreen(
+          measureStartPoint,
+          viewport,
+        )
+      : null
+
+  const measureEndScreen =
+    measureEndPoint
+      ? worldToScreen(
+          measureEndPoint,
+          viewport,
+        )
+      : null
+
+  const measureCursorScreen =
+    measureStartPoint &&
+    !measureEndPoint &&
+    cursorWorld
+      ? worldToScreen(
+          cursorWorld,
+          viewport,
+        )
+      : null
+
+  let completedMeasurement:
+    ReturnType<
+      typeof measureBetweenPoints
+    > | null = null
+
+  if (
+    measureStartPointId !==
+      null &&
+    measureEndPointId !==
+      null
+  ) {
+    try {
+      completedMeasurement =
+        measureBetweenPoints(
+          document,
+          measureStartPointId,
+          measureEndPointId,
+        )
+    } catch {
+      completedMeasurement =
+        null
+    }
+  }
 
   return (
     <div
@@ -1978,6 +2211,59 @@ export function CadCanvas({
             />
           )}
 
+        {/* COMPLETED MEASUREMENT GUIDE */}
+
+        {activeTool ===
+          'measure' &&
+          measureStartScreen &&
+          measureEndScreen && (
+            <line
+              x1={
+                measureStartScreen.xPx
+              }
+              y1={
+                measureStartScreen.yPx
+              }
+              x2={
+                measureEndScreen.xPx
+              }
+              y2={
+                measureEndScreen.yPx
+              }
+              stroke="#7c3aed"
+              strokeWidth={2}
+              strokeDasharray="4 4"
+              pointerEvents="none"
+            />
+          )}
+
+        {/* LIVE MEASUREMENT PREVIEW */}
+
+        {activeTool ===
+          'measure' &&
+          measureStartScreen &&
+          measureCursorScreen &&
+          !measureEndScreen && (
+            <line
+              x1={
+                measureStartScreen.xPx
+              }
+              y1={
+                measureStartScreen.yPx
+              }
+              x2={
+                measureCursorScreen.xPx
+              }
+              y2={
+                measureCursorScreen.yPx
+              }
+              stroke="#7c3aed"
+              strokeWidth={2}
+              strokeDasharray="4 4"
+              pointerEvents="none"
+            />
+          )}
+
         {/* PATTERN POINTS */}
 
         {Object.values(
@@ -2001,6 +2287,18 @@ export function CadCanvas({
             lineStartPointId ===
               point.id
 
+          const isMeasureStart =
+            activeTool ===
+              'measure' &&
+            measureStartPointId ===
+              point.id
+
+          const isMeasureEnd =
+            activeTool ===
+              'measure' &&
+            measureEndPointId ===
+              point.id
+
           return (
             <g key={point.id}>
               {isLineStart && (
@@ -2012,6 +2310,29 @@ export function CadCanvas({
                   stroke="#2563eb"
                   strokeWidth={2}
                   strokeDasharray="3 2"
+                />
+              )}
+
+              {isMeasureStart && (
+                <circle
+                  cx={screen.xPx}
+                  cy={screen.yPx}
+                  r={12}
+                  fill="none"
+                  stroke="#7c3aed"
+                  strokeWidth={2}
+                  strokeDasharray="3 2"
+                />
+              )}
+
+              {isMeasureEnd && (
+                <circle
+                  cx={screen.xPx}
+                  cy={screen.yPx}
+                  r={12}
+                  fill="none"
+                  stroke="#7c3aed"
+                  strokeWidth={2}
                 />
               )}
 
@@ -2314,6 +2635,55 @@ export function CadCanvas({
             </strong>
           )}
 
+        {activeTool ===
+          'measure' && (
+            <strong>
+              {measureToolMessage ??
+                (
+                  measureStartPointId ===
+                    null
+                    ? 'Measure: click the first point'
+                    : measureEndPointId ===
+                        null
+                      ? `Measure start: ${measureStartPointId} — choose second point`
+                      : `Measured ${measureStartPointId} → ${measureEndPointId}`
+                )}
+            </strong>
+          )}
+
+        {completedMeasurement && (
+          <>
+            <span>
+              Distance:{' '}
+              <strong>
+                {formatLength(
+                  completedMeasurement
+                    .distanceMm,
+                  unit,
+                )}
+              </strong>
+            </span>
+
+            <span>
+              ΔX:{' '}
+              {formatLength(
+                completedMeasurement
+                  .deltaXMm,
+                unit,
+              )}
+            </span>
+
+            <span>
+              ΔY:{' '}
+              {formatLength(
+                completedMeasurement
+                  .deltaYMm,
+                unit,
+              )}
+            </span>
+          </>
+        )}
+
         {selectedPoint && (
           <div
             style={{
@@ -2417,9 +2787,7 @@ export function CadCanvas({
                     '#b00020',
                 }}
               >
-                {
-                  coordinateError
-                }
+                {coordinateError}
               </span>
             )}
           </div>
@@ -2534,6 +2902,29 @@ export function CadCanvas({
             }}
           >
             Line
+          </button>
+
+          <button
+            type="button"
+            aria-pressed={
+              activeTool ===
+              'measure'
+            }
+            onClick={() => {
+              activateTool(
+                'measure',
+              )
+            }}
+            title="Measure between two points"
+            style={{
+              fontWeight:
+                activeTool ===
+                'measure'
+                  ? 'bold'
+                  : 'normal',
+            }}
+          >
+            Measure
           </button>
 
           <button
