@@ -8,6 +8,10 @@ import {
   type WheelEvent,
 } from 'react'
 
+import {
+  PointLabel,
+} from './PointLabel'
+
 import type {
   ScreenPosition,
   WorldPosition,
@@ -3530,19 +3534,17 @@ export function CadCanvas({
                 }
               />
 
-              <text
-                x={
-                  screen.xPx +
-                  10
+              <PointLabel
+                xPx={
+                  screen.xPx
                 }
-                y={
-                  screen.yPx -
-                  10
+                yPx={
+                  screen.yPx
                 }
-                fontSize="16"
-              >
-                {point.name}
-              </text>
+                name={
+                  point.name
+                }
+              />
             </g>
           )
         })}

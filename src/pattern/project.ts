@@ -10,7 +10,11 @@ import {
 
 export const
   PATTERN_PROJECT_SCHEMA_VERSION =
-    1 as const
+    2 as const
+
+export const
+  DEFAULT_HALF_BODY_ALLOWANCE_MM =
+    10
 
 export type PatternProjectSchemaVersion =
   typeof PATTERN_PROJECT_SCHEMA_VERSION
@@ -50,9 +54,6 @@ export interface PatternProject {
    *
    * null means no validated drafting
    * rule version has been assigned yet.
-   *
-   * We do not invent a version before
-   * the real formulas exist.
    */
   draftingRuleVersion:
     string | null
@@ -69,11 +70,21 @@ export interface PatternProject {
     BodyMeasurements | null
 
   /*
-   * The actual CAD geometry.
+   * Explicit allowance added to the
+   * combined HALF-BODY construction.
    *
-   * This remains independent from the
-   * measurements and future formula
-   * engine.
+   * The reference video uses +1 cm on
+   * the half-body width, which equals
+   * +2 cm on the completed body
+   * circumference.
+   *
+   * Raw Chest Girth C is NEVER changed.
+   */
+  halfBodyAllowanceMm:
+    number
+
+  /*
+   * The actual CAD geometry.
    */
   document:
     PatternDocument
@@ -95,6 +106,15 @@ function copyBodyMeasurements(
   }
 }
 
+function isFiniteNumber(
+  value: unknown,
+): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value)
+  )
+}
+
 export function createPatternProject():
 PatternProject {
   return {
@@ -109,6 +129,9 @@ PatternProject {
 
     measurements:
       null,
+
+    halfBodyAllowanceMm:
+      DEFAULT_HALF_BODY_ALLOWANCE_MM,
 
     document:
       createEmptyDocument(),
@@ -132,12 +155,6 @@ export function setPatternProjectMeasurements(
     )
   }
 
-  /*
-   * Copy the values so outside code
-   * cannot later mutate the project's
-   * measurement source-of-truth by
-   * changing the original object.
-   */
   return {
     ...project,
 
@@ -164,6 +181,37 @@ export function clearPatternProjectMeasurements(
 
     measurements:
       null,
+  }
+}
+
+export function setPatternProjectHalfBodyAllowanceMm(
+  project:
+    PatternProject,
+
+  halfBodyAllowanceMm:
+    number,
+): PatternProject {
+  if (
+    !isFiniteNumber(
+      halfBodyAllowanceMm,
+    )
+  ) {
+    throw new Error(
+      'Half-body allowance must be a finite number.',
+    )
+  }
+
+  if (
+    project.halfBodyAllowanceMm ===
+    halfBodyAllowanceMm
+  ) {
+    return project
+  }
+
+  return {
+    ...project,
+
+    halfBodyAllowanceMm,
   }
 }
 

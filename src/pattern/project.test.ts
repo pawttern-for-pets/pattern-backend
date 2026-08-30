@@ -15,9 +15,11 @@ import {
 import {
   clearPatternProjectMeasurements,
   createPatternProject,
+  DEFAULT_HALF_BODY_ALLOWANCE_MM,
   PATTERN_PROJECT_SCHEMA_VERSION,
   setDraftingRuleVersion,
   setPatternProjectDocument,
+  setPatternProjectHalfBodyAllowanceMm,
   setPatternProjectMeasurements,
 } from './project'
 
@@ -25,7 +27,7 @@ describe(
   'PAWTTERN PatternProject',
   () => {
     it(
-      'creates version 1 of the project container',
+      'creates version 2 of the project container',
       () => {
         const project =
           createPatternProject()
@@ -40,7 +42,7 @@ describe(
         expect(
           project
             .projectSchemaVersion,
-        ).toBe(1)
+        ).toBe(2)
       },
     )
 
@@ -55,6 +57,71 @@ describe(
         ).toBe(
           'racerback-tank',
         )
+      },
+    )
+
+
+
+    it(
+      'uses the video reference plus one centimeter half-body allowance by default',
+      () => {
+        const project =
+          createPatternProject()
+
+        expect(
+          project.halfBodyAllowanceMm,
+        ).toBe(
+          DEFAULT_HALF_BODY_ALLOWANCE_MM,
+        )
+
+        expect(
+          project.halfBodyAllowanceMm,
+        ).toBe(10)
+      },
+    )
+
+    it(
+      'updates half-body allowance without changing raw chest girth',
+      () => {
+        const measurements =
+          createBodyMeasurementsFromCm({
+            backLengthCm: 30,
+            chestGirthCm: 42,
+            neckGirthCm: 25,
+          })
+
+        const project =
+          setPatternProjectMeasurements(
+            createPatternProject(),
+            measurements,
+          )
+
+        const updated =
+          setPatternProjectHalfBodyAllowanceMm(
+            project,
+            15,
+          )
+
+        expect(
+          updated.halfBodyAllowanceMm,
+        ).toBe(15)
+
+        expect(
+          updated.measurements
+            ?.chestGirthMm,
+        ).toBe(420)
+      },
+    )
+
+    it(
+      'rejects a non-finite half-body allowance',
+      () => {
+        expect(() =>
+          setPatternProjectHalfBodyAllowanceMm(
+            createPatternProject(),
+            Number.NaN,
+          ),
+        ).toThrow()
       },
     )
 

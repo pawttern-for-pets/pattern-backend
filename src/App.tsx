@@ -10,9 +10,17 @@ import {
   CadCanvas,
 } from './components/CadCanvas'
 
+import {
+  PatternInputPanel,
+} from './components/PatternInputPanel'
+
 import type {
   PatternDocument,
 } from './cad/document'
+
+import type {
+  BodyMeasurements,
+} from './pattern/measurements'
 
 import type {
   DisplayUnit,
@@ -27,17 +35,22 @@ import {
 } from './cad/history'
 
 import {
-  createCleanPatternSnapshot,
-  hasUnsavedPatternChanges,
-  type CleanPatternSnapshot,
-} from './cad/projectDirty'
+  createCleanPatternProjectSnapshot,
+  hasUnsavedPatternProjectChanges,
+  type CleanPatternProjectSnapshot,
+} from './pattern/projectDirty'
 
 import {
-  createNewPatternHistory,
-  openPatternHistoryFromJson,
-  serializePatternForSave,
-  type PatternHistory,
-} from './cad/projectLifecycle'
+  createNewPatternProjectHistory,
+  openPatternProjectHistoryFromJson,
+  serializePatternProjectForSave,
+  type PatternProjectHistory,
+} from './pattern/projectLifecycle'
+
+import {
+  setPatternProjectDocument,
+  setPatternProjectMeasurements,
+} from './pattern/project'
 
 import {
   isFileSystemAccessSupported,
@@ -52,10 +65,10 @@ const DEFAULT_PATTERN_FILE_NAME =
 
 interface ProjectState {
   patternHistory:
-    PatternHistory
+    PatternProjectHistory
 
   cleanSnapshot:
-    CleanPatternSnapshot
+    CleanPatternProjectSnapshot
 
   /*
    * Real browser file handle.
@@ -107,13 +120,13 @@ function normalizePatternFileName(
 function createInitialProjectState():
 ProjectState {
   const patternHistory =
-    createNewPatternHistory()
+    createNewPatternProjectHistory()
 
   return {
     patternHistory,
 
     cleanSnapshot:
-      createCleanPatternSnapshot(
+      createCleanPatternProjectSnapshot(
         patternHistory.present,
       ),
 
@@ -163,8 +176,11 @@ function App() {
   const patternHistory =
     project.patternHistory
 
-  const patternDocument =
+  const patternProject =
     patternHistory.present
+
+  const patternDocument =
+    patternProject.document
 
   /*
    * Dirty state is calculated by
@@ -186,12 +202,12 @@ function App() {
   const hasUnsavedChanges =
     useMemo(
       () =>
-        hasUnsavedPatternChanges(
-          patternDocument,
+        hasUnsavedPatternProjectChanges(
+          patternProject,
           project.cleanSnapshot,
         ),
       [
-        patternDocument,
+        patternProject,
         project.cleanSnapshot,
       ],
     )
@@ -236,11 +252,20 @@ function App() {
   ) => {
     setProject(
       (currentProject) => {
-        if (
-          nextDocument ===
+        const currentPatternProject =
           currentProject
             .patternHistory
             .present
+
+        const nextPatternProject =
+          setPatternProjectDocument(
+            currentPatternProject,
+            nextDocument,
+          )
+
+        if (
+          nextPatternProject ===
+          currentPatternProject
         ) {
           return currentProject
         }
@@ -253,7 +278,50 @@ function App() {
               currentProject
                 .patternHistory,
 
-              nextDocument,
+              nextPatternProject,
+            ),
+        }
+      },
+    )
+
+    setProjectMessage(null)
+  }
+
+  const handleGenerateBaseBlock = (
+    measurements:
+      BodyMeasurements,
+
+    document:
+      PatternDocument,
+  ) => {
+    setProject(
+      (currentProject) => {
+        const currentPatternProject =
+          currentProject
+            .patternHistory
+            .present
+
+        let nextPatternProject =
+          setPatternProjectMeasurements(
+            currentPatternProject,
+            measurements,
+          )
+
+        nextPatternProject =
+          setPatternProjectDocument(
+            nextPatternProject,
+            document,
+          )
+
+        return {
+          ...currentProject,
+
+          patternHistory:
+            commitHistory(
+              currentProject
+                .patternHistory,
+
+              nextPatternProject,
             ),
         }
       },
@@ -325,13 +393,13 @@ function App() {
       setProject(
         (currentProject) => {
           const patternHistory =
-            createNewPatternHistory()
+            createNewPatternProjectHistory()
 
           return {
             patternHistory,
 
             cleanSnapshot:
-              createCleanPatternSnapshot(
+              createCleanPatternProjectSnapshot(
                 patternHistory.present,
               ),
 
@@ -401,12 +469,12 @@ function App() {
          * cannot destroy current work.
          */
         const openedHistory =
-          openPatternHistoryFromJson(
+          openPatternProjectHistoryFromJson(
             opened.text,
           )
 
         const cleanSnapshot =
-          createCleanPatternSnapshot(
+          createCleanPatternProjectSnapshot(
             openedHistory.present,
           )
 
@@ -519,8 +587,8 @@ function App() {
          * Windows Save As dialog.
          */
         const json =
-          serializePatternForSave(
-            patternDocument,
+          serializePatternProjectForSave(
+            patternProject,
           )
 
         const suggestedName =
@@ -594,8 +662,8 @@ function App() {
 
       try {
         const json =
-          serializePatternForSave(
-            patternDocument,
+          serializePatternProjectForSave(
+            patternProject,
           )
 
         /*
@@ -833,6 +901,22 @@ function App() {
           </select>
         </label>
       </header>
+
+      <PatternInputPanel
+        key={
+          `pattern-input-${project.sessionId}`
+        }
+        measurements={
+          patternProject.measurements
+        }
+        halfBodyAllowanceMm={
+          patternProject
+            .halfBodyAllowanceMm
+        }
+        onGenerate={
+          handleGenerateBaseBlock
+        }
+      />
 
       <main className="workspace">
         <CadCanvas
