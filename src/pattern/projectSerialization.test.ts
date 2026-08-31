@@ -19,9 +19,13 @@ import {
 
 import {
   createPatternProject,
+  setDraftingRuleVersion,
   setPatternProjectDocument,
   setPatternProjectHalfBodyAllowanceMm,
+  setPatternProjectHeadGirthMm,
   setPatternProjectMeasurements,
+  setPatternProjectNeckOpeningAllowanceMm,
+  setPatternProjectShoulderLengthMm,
 } from './project'
 
 import {
@@ -33,7 +37,7 @@ describe(
   'PAWTTERN PatternProject serialization',
   () => {
     it(
-      'saves measurements allowance and CAD geometry together',
+      'saves Schema-3 drafting parameters measurements and CAD geometry together',
       () => {
         const measurements =
           createBodyMeasurementsFromCm({
@@ -52,6 +56,30 @@ describe(
           setPatternProjectHalfBodyAllowanceMm(
             project,
             10,
+          )
+
+        project =
+          setPatternProjectShoulderLengthMm(
+            project,
+            30,
+          )
+
+        project =
+          setPatternProjectNeckOpeningAllowanceMm(
+            project,
+            15,
+          )
+
+        project =
+          setPatternProjectHeadGirthMm(
+            project,
+            320,
+          )
+
+        project =
+          setDraftingRuleVersion(
+            project,
+            'PAWTTERN_MASTER_V2',
           )
 
         const document =
@@ -82,6 +110,10 @@ describe(
           )
 
         expect(
+          opened.projectSchemaVersion,
+        ).toBe(3)
+
+        expect(
           opened.measurements,
         ).toEqual({
           backLengthMm: 220,
@@ -94,8 +126,90 @@ describe(
         ).toBe(10)
 
         expect(
+          opened.shoulderLengthMm,
+        ).toBe(30)
+
+        expect(
+          opened.neckOpeningAllowanceMm,
+        ).toBe(15)
+
+        expect(
+          opened.headGirthMm,
+        ).toBe(320)
+
+        expect(
+          opened.draftingRuleVersion,
+        ).toBe(
+          'PAWTTERN_MASTER_V2',
+        )
+
+        expect(
           opened.document.points.A,
         ).toBeDefined()
+      },
+    )
+
+    it(
+      'migrates a version 2 project while preserving historical data',
+      () => {
+        const measurements =
+          createBodyMeasurementsFromCm({
+            backLengthCm: 22,
+            chestGirthCm: 36,
+            neckGirthCm: 27,
+          })
+
+        const legacyProject = {
+          projectSchemaVersion: 2,
+          patternType:
+            'racerback-tank',
+          draftingRuleVersion:
+            'racerback-v1',
+          measurements,
+          halfBodyAllowanceMm:
+            10,
+          document:
+            createEmptyDocument(),
+        }
+
+        const opened =
+          deserializePatternProject(
+            JSON.stringify(
+              legacyProject,
+            ),
+          )
+
+        expect(
+          opened.projectSchemaVersion,
+        ).toBe(3)
+
+        expect(
+          opened.halfBodyAllowanceMm,
+        ).toBe(10)
+
+        expect(
+          opened.measurements,
+        ).toEqual(
+          measurements,
+        )
+
+        expect(
+          opened.draftingRuleVersion,
+        ).toBe(
+          'racerback-v1',
+        )
+
+        expect(
+          opened.shoulderLengthMm,
+        ).toBeNull()
+
+        expect(
+          opened.neckOpeningAllowanceMm,
+        ).toBe(0)
+
+        expect(
+          opened.headGirthMm,
+        ).toBeNull()
       },
     )
 
@@ -129,7 +243,7 @@ describe(
 
         expect(
           opened.projectSchemaVersion,
-        ).toBe(2)
+        ).toBe(3)
 
         expect(
           opened.halfBodyAllowanceMm,
@@ -140,11 +254,23 @@ describe(
         ).toEqual(
           measurements,
         )
+
+        expect(
+          opened.shoulderLengthMm,
+        ).toBeNull()
+
+        expect(
+          opened.neckOpeningAllowanceMm,
+        ).toBe(0)
+
+        expect(
+          opened.headGirthMm,
+        ).toBeNull()
       },
     )
 
     it(
-      'opens a legacy geometry-only PAWTTERN document without inventing measurements or allowance',
+      'opens a geometry-only legacy document without inventing drafting parameters',
       () => {
         const legacyDocument =
           addPoint(
@@ -168,6 +294,10 @@ describe(
           )
 
         expect(
+          opened.projectSchemaVersion,
+        ).toBe(3)
+
+        expect(
           opened.measurements,
         ).toBeNull()
 
@@ -176,10 +306,40 @@ describe(
         ).toBe(0)
 
         expect(
+          opened.shoulderLengthMm,
+        ).toBeNull()
+
+        expect(
+          opened.neckOpeningAllowanceMm,
+        ).toBe(0)
+
+        expect(
+          opened.headGirthMm,
+        ).toBeNull()
+
+        expect(
           opened.document,
         ).toEqual(
           legacyDocument,
         )
+      },
+    )
+
+    it(
+      'rejects invalid Schema-3 negative allowances',
+      () => {
+        const invalidProject = {
+          ...createPatternProject(),
+
+          halfBodyAllowanceMm:
+            -1,
+        }
+
+        expect(() =>
+          serializePatternProject(
+            invalidProject,
+          ),
+        ).toThrow()
       },
     )
 

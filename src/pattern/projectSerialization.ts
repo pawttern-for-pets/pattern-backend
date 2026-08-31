@@ -36,6 +36,27 @@ function isFiniteNumber(
   )
 }
 
+function isValidNonNegativeNumber(
+  value: unknown,
+): value is number {
+  return (
+    isFiniteNumber(value) &&
+    value >= 0
+  )
+}
+
+function isValidOptionalPositiveNumber(
+  value: unknown,
+): value is number | null {
+  return (
+    value === null ||
+    (
+      isFiniteNumber(value) &&
+      value > 0
+    )
+  )
+}
+
 function isValidDraftingRuleVersion(
   value: unknown,
 ): value is string | null {
@@ -47,6 +68,12 @@ function isValidDraftingRuleVersion(
     )
   )
 }
+
+/*
+ * --------------------------------
+ * CURRENT PROJECT — SCHEMA 3
+ * --------------------------------
+ */
 
 export function isValidPatternProject(
   value: unknown,
@@ -63,7 +90,79 @@ export function isValidPatternProject(
     !isValidDraftingRuleVersion(
       value.draftingRuleVersion,
     ) ||
-    !isFiniteNumber(
+    !isValidNonNegativeNumber(
+      value.halfBodyAllowanceMm,
+    ) ||
+    !isValidOptionalPositiveNumber(
+      value.shoulderLengthMm,
+    ) ||
+    !isValidNonNegativeNumber(
+      value.neckOpeningAllowanceMm,
+    ) ||
+    !isValidOptionalPositiveNumber(
+      value.headGirthMm,
+    )
+  ) {
+    return false
+  }
+
+  if (
+    value.measurements !== null &&
+    !isValidBodyMeasurements(
+      value.measurements,
+    )
+  ) {
+    return false
+  }
+
+  return isValidPatternDocument(
+    value.document,
+  )
+}
+
+/*
+ * --------------------------------
+ * LEGACY SCHEMA 2
+ * --------------------------------
+ *
+ * Schema 2 already contained:
+ *
+ * measurements
+ * halfBodyAllowanceMm
+ * draftingRuleVersion
+ * document
+ *
+ * It did NOT contain:
+ *
+ * shoulderLengthMm
+ * neckOpeningAllowanceMm
+ * headGirthMm
+ */
+
+interface LegacyPatternProjectV2 {
+  projectSchemaVersion: 2
+  patternType: 'racerback-tank'
+  draftingRuleVersion: string | null
+  measurements: BodyMeasurements | null
+  halfBodyAllowanceMm: number
+  document: PatternProject['document']
+}
+
+function isValidLegacyPatternProjectV2(
+  value: unknown,
+): value is LegacyPatternProjectV2 {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  if (
+    value.projectSchemaVersion !== 2 ||
+    value.patternType !==
+      'racerback-tank' ||
+    !isValidDraftingRuleVersion(
+      value.draftingRuleVersion,
+    ) ||
+    !isValidNonNegativeNumber(
       value.halfBodyAllowanceMm,
     )
   ) {
@@ -83,6 +182,65 @@ export function isValidPatternProject(
     value.document,
   )
 }
+
+function migrateLegacyProjectV2(
+  legacy:
+    LegacyPatternProjectV2,
+): PatternProject {
+  let project =
+    createPatternProject()
+
+  /*
+   * Preserve Schema-2 allowance
+   * exactly as stored.
+   */
+  project =
+    setPatternProjectHalfBodyAllowanceMm(
+      project,
+      legacy.halfBodyAllowanceMm,
+    )
+
+  if (
+    legacy.measurements !== null
+  ) {
+    project =
+      setPatternProjectMeasurements(
+        project,
+        legacy.measurements,
+      )
+  }
+
+  project =
+    setDraftingRuleVersion(
+      project,
+      legacy.draftingRuleVersion,
+    )
+
+  project =
+    setPatternProjectDocument(
+      project,
+      legacy.document,
+    )
+
+  /*
+   * New Schema-3 fields deliberately
+   * remain at safe defaults:
+   *
+   * shoulderLengthMm       = null
+   * neckOpeningAllowanceMm = 0
+   * headGirthMm             = null
+   *
+   * We do NOT invent historical data.
+   */
+
+  return project
+}
+
+/*
+ * --------------------------------
+ * LEGACY SCHEMA 1
+ * --------------------------------
+ */
 
 interface LegacyPatternProjectV1 {
   projectSchemaVersion: 1
@@ -133,13 +291,11 @@ function migrateLegacyProjectV1(
 
   /*
    * V1 projects were created before
-   * PAWTTERN adopted the reference
-   * video's explicit +1 cm half-body
-   * allowance.
+   * PAWTTERN adopted the explicit
+   * +1 cm half-body allowance.
    *
-   * Preserve their historical meaning
-   * by migrating them with 0 mm rather
-   * than silently changing geometry.
+   * Preserve historical meaning by
+   * migrating with 0 mm.
    */
   project =
     setPatternProjectHalfBodyAllowanceMm(
@@ -207,6 +363,9 @@ export function deserializePatternProject(
     )
   }
 
+  /*
+   * Current Schema 3.
+   */
   if (
     isValidPatternProject(
       parsed,
@@ -215,6 +374,22 @@ export function deserializePatternProject(
     return parsed
   }
 
+  /*
+   * Schema 2 → Schema 3.
+   */
+  if (
+    isValidLegacyPatternProjectV2(
+      parsed,
+    )
+  ) {
+    return migrateLegacyProjectV2(
+      parsed,
+    )
+  }
+
+  /*
+   * Schema 1 → Schema 3.
+   */
   if (
     isValidLegacyPatternProjectV1(
       parsed,
@@ -226,12 +401,12 @@ export function deserializePatternProject(
   }
 
   /*
-   * Older PAWTTERN files stored only
-   * PatternDocument geometry.
+   * Very old PAWTTERN files stored
+   * only PatternDocument geometry.
    *
-   * Preserve those files without
-   * inventing measurements or changing
-   * their historical allowance basis.
+   * Preserve them without inventing
+   * measurements or historical
+   * allowances.
    */
   if (
     isValidPatternDocument(

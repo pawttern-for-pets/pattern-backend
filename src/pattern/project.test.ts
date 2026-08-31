@@ -16,33 +16,35 @@ import {
   clearPatternProjectMeasurements,
   createPatternProject,
   DEFAULT_HALF_BODY_ALLOWANCE_MM,
+  DEFAULT_NECK_OPENING_ALLOWANCE_MM,
   PATTERN_PROJECT_SCHEMA_VERSION,
   setDraftingRuleVersion,
   setPatternProjectDocument,
   setPatternProjectHalfBodyAllowanceMm,
+  setPatternProjectHeadGirthMm,
   setPatternProjectMeasurements,
+  setPatternProjectNeckOpeningAllowanceMm,
+  setPatternProjectShoulderLengthMm,
 } from './project'
 
 describe(
   'PAWTTERN PatternProject',
   () => {
     it(
-      'creates version 2 of the project container',
+      'creates version 3 of the project container',
       () => {
         const project =
           createPatternProject()
 
         expect(
-          project
-            .projectSchemaVersion,
+          project.projectSchemaVersion,
         ).toBe(
           PATTERN_PROJECT_SCHEMA_VERSION,
         )
 
         expect(
-          project
-            .projectSchemaVersion,
-        ).toBe(2)
+          project.projectSchemaVersion,
+        ).toBe(3)
       },
     )
 
@@ -60,10 +62,8 @@ describe(
       },
     )
 
-
-
     it(
-      'uses the video reference plus one centimeter half-body allowance by default',
+      'uses the Video-2 plus one centimeter half-body allowance by default',
       () => {
         const project =
           createPatternProject()
@@ -77,6 +77,50 @@ describe(
         expect(
           project.halfBodyAllowanceMm,
         ).toBe(10)
+      },
+    )
+
+    it(
+      'does not invent a shoulder length for a new project',
+      () => {
+        const project =
+          createPatternProject()
+
+        expect(
+          project.shoulderLengthMm,
+        ).toBeNull()
+      },
+    )
+
+    it(
+      'starts neck opening allowance at zero',
+      () => {
+        const project =
+          createPatternProject()
+
+        expect(
+          project
+            .neckOpeningAllowanceMm,
+        ).toBe(
+          DEFAULT_NECK_OPENING_ALLOWANCE_MM,
+        )
+
+        expect(
+          project
+            .neckOpeningAllowanceMm,
+        ).toBe(0)
+      },
+    )
+
+    it(
+      'does not invent a head girth for a new project',
+      () => {
+        const project =
+          createPatternProject()
+
+        expect(
+          project.headGirthMm,
+        ).toBeNull()
       },
     )
 
@@ -114,10 +158,202 @@ describe(
     )
 
     it(
-      'rejects a non-finite half-body allowance',
+      'rejects invalid half-body allowances',
       () => {
         expect(() =>
           setPatternProjectHalfBodyAllowanceMm(
+            createPatternProject(),
+            Number.NaN,
+          ),
+        ).toThrow()
+
+        expect(() =>
+          setPatternProjectHalfBodyAllowanceMm(
+            createPatternProject(),
+            -1,
+          ),
+        ).toThrow()
+      },
+    )
+
+    it(
+      'stores an explicit shoulder length without assigning a nominal size',
+      () => {
+        const project =
+          setPatternProjectShoulderLengthMm(
+            createPatternProject(),
+            30,
+          )
+
+        expect(
+          project.shoulderLengthMm,
+        ).toBe(30)
+
+        expect(
+          'size' in project,
+        ).toBe(false)
+      },
+    )
+
+    it(
+      'can clear shoulder length back to null',
+      () => {
+        const project =
+          setPatternProjectShoulderLengthMm(
+            createPatternProject(),
+            30,
+          )
+
+        const cleared =
+          setPatternProjectShoulderLengthMm(
+            project,
+            null,
+          )
+
+        expect(
+          cleared.shoulderLengthMm,
+        ).toBeNull()
+      },
+    )
+
+    it(
+      'rejects invalid shoulder lengths',
+      () => {
+        expect(() =>
+          setPatternProjectShoulderLengthMm(
+            createPatternProject(),
+            0,
+          ),
+        ).toThrow()
+
+        expect(() =>
+          setPatternProjectShoulderLengthMm(
+            createPatternProject(),
+            -10,
+          ),
+        ).toThrow()
+
+        expect(() =>
+          setPatternProjectShoulderLengthMm(
+            createPatternProject(),
+            Number.NaN,
+          ),
+        ).toThrow()
+      },
+    )
+
+    it(
+      'stores optional neck opening allowance separately from raw neck girth',
+      () => {
+        const measurements =
+          createBodyMeasurementsFromCm({
+            backLengthCm: 30,
+            chestGirthCm: 42,
+            neckGirthCm: 25,
+          })
+
+        let project =
+          setPatternProjectMeasurements(
+            createPatternProject(),
+            measurements,
+          )
+
+        project =
+          setPatternProjectNeckOpeningAllowanceMm(
+            project,
+            20,
+          )
+
+        expect(
+          project
+            .neckOpeningAllowanceMm,
+        ).toBe(20)
+
+        expect(
+          project.measurements
+            ?.neckGirthMm,
+        ).toBe(250)
+      },
+    )
+
+    it(
+      'rejects negative neck opening allowance',
+      () => {
+        expect(() =>
+          setPatternProjectNeckOpeningAllowanceMm(
+            createPatternProject(),
+            -1,
+          ),
+        ).toThrow()
+      },
+    )
+
+    it(
+      'stores optional head girth without changing neck girth',
+      () => {
+        const measurements =
+          createBodyMeasurementsFromCm({
+            backLengthCm: 30,
+            chestGirthCm: 42,
+            neckGirthCm: 25,
+          })
+
+        let project =
+          setPatternProjectMeasurements(
+            createPatternProject(),
+            measurements,
+          )
+
+        project =
+          setPatternProjectHeadGirthMm(
+            project,
+            320,
+          )
+
+        expect(
+          project.headGirthMm,
+        ).toBe(320)
+
+        expect(
+          project.measurements
+            ?.neckGirthMm,
+        ).toBe(250)
+      },
+    )
+
+    it(
+      'can clear optional head girth',
+      () => {
+        const project =
+          setPatternProjectHeadGirthMm(
+            createPatternProject(),
+            320,
+          )
+
+        const cleared =
+          setPatternProjectHeadGirthMm(
+            project,
+            null,
+          )
+
+        expect(
+          cleared.headGirthMm,
+        ).toBeNull()
+      },
+    )
+
+    it(
+      'rejects invalid head girth',
+      () => {
+        expect(() =>
+          setPatternProjectHeadGirthMm(
+            createPatternProject(),
+            0,
+          ),
+        ).toThrow()
+
+        expect(() =>
+          setPatternProjectHeadGirthMm(
             createPatternProject(),
             Number.NaN,
           ),
@@ -144,8 +380,7 @@ describe(
           createPatternProject()
 
         expect(
-          project
-            .draftingRuleVersion,
+          project.draftingRuleVersion,
         ).toBeNull()
       },
     )
@@ -173,9 +408,6 @@ describe(
     it(
       'stores validated raw body measurements without changing them',
       () => {
-        const project =
-          createPatternProject()
-
         const measurements =
           createBodyMeasurementsFromCm({
             backLengthCm: 30,
@@ -185,7 +417,7 @@ describe(
 
         const updated =
           setPatternProjectMeasurements(
-            project,
+            createPatternProject(),
             measurements,
           )
 
@@ -196,24 +428,12 @@ describe(
           chestGirthMm: 420,
           neckGirthMm: 250,
         })
-
-        /*
-         * No hidden ease or other
-         * modification is permitted.
-         */
-        expect(
-          updated.measurements
-            ?.chestGirthMm,
-        ).toBe(420)
       },
     )
 
     it(
-      'copies assigned measurements so the source object cannot mutate the project',
+      'copies assigned measurements so source data cannot mutate the project',
       () => {
-        const project =
-          createPatternProject()
-
         const measurements =
           createBodyMeasurementsFromCm({
             backLengthCm: 30,
@@ -223,7 +443,7 @@ describe(
 
         const updated =
           setPatternProjectMeasurements(
-            project,
+            createPatternProject(),
             measurements,
           )
 
@@ -246,12 +466,9 @@ describe(
     it(
       'rejects invalid body measurements',
       () => {
-        const project =
-          createPatternProject()
-
         expect(() =>
           setPatternProjectMeasurements(
-            project,
+            createPatternProject(),
             {
               backLengthMm: 300,
               chestGirthMm: 0,
@@ -288,7 +505,7 @@ describe(
     )
 
     it(
-      'updates CAD geometry without changing the measurement source-of-truth',
+      'updates CAD geometry without changing measurements',
       () => {
         const measurements =
           createBodyMeasurementsFromCm({
@@ -353,20 +570,16 @@ describe(
     it(
       'assigns a drafting rule version only when one actually exists',
       () => {
-        const project =
-          createPatternProject()
-
         const updated =
           setDraftingRuleVersion(
-            project,
-            'racerback-v1',
+            createPatternProject(),
+            'PAWTTERN_MASTER_V2',
           )
 
         expect(
-          updated
-            .draftingRuleVersion,
+          updated.draftingRuleVersion,
         ).toBe(
-          'racerback-v1',
+          'PAWTTERN_MASTER_V2',
         )
       },
     )
@@ -374,12 +587,9 @@ describe(
     it(
       'rejects an empty drafting rule version',
       () => {
-        const project =
-          createPatternProject()
-
         expect(() =>
           setDraftingRuleVersion(
-            project,
+            createPatternProject(),
             '   ',
           ),
         ).toThrow()
