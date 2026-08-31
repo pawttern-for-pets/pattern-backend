@@ -288,3 +288,45 @@ describe(
     )
   },
 )
+    it(
+      'converges closely to the exact 200 mm length of the symmetric arch',
+      () => {
+        const length =
+          approximateCubicBezierLengthMm(
+            archCurve,
+            1000,
+          )
+
+        expect(
+          length,
+        ).toBeCloseTo(
+          200,
+          3,
+        )
+      },
+    )
+    it(
+      'changes by less than 0.001 mm between 1000 and 5000 segments',
+      () => {
+        const length1000 =
+          approximateCubicBezierLengthMm(
+            archCurve,
+            1000,
+          )
+
+        const length5000 =
+          approximateCubicBezierLengthMm(
+            archCurve,
+            5000,
+          )
+
+        expect(
+          Math.abs(
+            length5000 -
+              length1000,
+          ),
+        ).toBeLessThan(
+          0.001,
+        )
+      },
+    )
