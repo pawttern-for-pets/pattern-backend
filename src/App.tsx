@@ -48,9 +48,15 @@ import {
 } from './pattern/projectLifecycle'
 
 import {
+  setDraftingRuleVersion,
   setPatternProjectDocument,
   setPatternProjectMeasurements,
+  setPatternProjectShoulderLengthMm,
 } from './pattern/project'
+
+import {
+  PAWTTERN_MASTER_V2_RULE_VERSION,
+} from './pattern/referenceTankV2Formula'
 
 import {
   isFileSystemAccessSupported,
@@ -184,20 +190,9 @@ function App() {
 
   /*
    * Dirty state is calculated by
-   * comparing current geometry against
-   * the last successful Save/Open/New
-   * clean snapshot.
-   *
-   * Therefore:
-   *
-   * Save
-   *   -> clean
-   *
-   * edit
-   *   -> dirty
-   *
-   * Undo back to saved geometry
-   *   -> clean again
+   * comparing the complete current
+   * PatternProject against the last
+   * successful Save/Open/New snapshot.
    */
   const hasUnsavedChanges =
     useMemo(
@@ -214,7 +209,8 @@ function App() {
 
   /*
    * Warn before browser reload/close
-   * when real unsaved geometry exists.
+   * when real unsaved project changes
+   * exist.
    */
   useEffect(() => {
     const handleBeforeUnload = (
@@ -287,9 +283,34 @@ function App() {
     setProjectMessage(null)
   }
 
+  /*
+   * GENERATE VIDEO-2 MASTER BLOCK
+   *
+   * One Generate action stores:
+   *
+   * raw B / C / N
+   * shoulder length
+   * drafting rule version
+   * generated CAD document
+   *
+   * All are committed together as ONE
+   * PatternProject history action.
+   *
+   * This keeps:
+   *
+   * Undo
+   * Redo
+   * Save
+   * Open
+   *
+   * synchronized.
+   */
   const handleGenerateBaseBlock = (
     measurements:
       BodyMeasurements,
+
+    shoulderLengthMm:
+      number,
 
     document:
       PatternDocument,
@@ -305,6 +326,18 @@ function App() {
           setPatternProjectMeasurements(
             currentPatternProject,
             measurements,
+          )
+
+        nextPatternProject =
+          setPatternProjectShoulderLengthMm(
+            nextPatternProject,
+            shoulderLengthMm,
+          )
+
+        nextPatternProject =
+          setDraftingRuleVersion(
+            nextPatternProject,
+            PAWTTERN_MASTER_V2_RULE_VERSION,
           )
 
         nextPatternProject =
@@ -378,9 +411,9 @@ function App() {
   /*
    * NEW
    *
-   * Creates a completely blank
-   * document and intentionally forgets
-   * the previous file handle.
+   * Creates a completely blank project
+   * and forgets the previous file
+   * handle.
    */
   const handleNewPattern =
     () => {
@@ -698,10 +731,6 @@ function App() {
    *
    * Ctrl + Shift + S
    *   -> PAWTTERN Save As
-   *
-   * preventDefault() is essential.
-   * Without it Chrome opens its own
-   * "Save web page" dialog.
    */
   useEffect(() => {
     const handleProjectShortcut = (
@@ -912,6 +941,10 @@ function App() {
         halfBodyAllowanceMm={
           patternProject
             .halfBodyAllowanceMm
+        }
+        shoulderLengthMm={
+          patternProject
+            .shoulderLengthMm
         }
         onGenerate={
           handleGenerateBaseBlock

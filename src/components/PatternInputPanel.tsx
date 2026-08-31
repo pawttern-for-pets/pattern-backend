@@ -19,8 +19,8 @@ import {
 } from '../pattern/measurements'
 
 import {
-  createReferenceTankArmholeConstruction,
-} from '../pattern/referenceTankArmholeConstruction'
+  createReferenceTankV2Construction,
+} from '../pattern/referenceTankV2Construction'
 
 interface PatternInputPanelProps {
   measurements:
@@ -29,9 +29,15 @@ interface PatternInputPanelProps {
   halfBodyAllowanceMm:
     number
 
+  shoulderLengthMm:
+    number | null
+
   onGenerate: (
     measurements:
       BodyMeasurements,
+
+    shoulderLengthMm:
+      number,
 
     document:
       PatternDocument,
@@ -86,6 +92,7 @@ function formatAllowanceCm(
 export function PatternInputPanel({
   measurements,
   halfBodyAllowanceMm,
+  shoulderLengthMm,
   onGenerate,
 }: PatternInputPanelProps) {
   const [
@@ -104,6 +111,11 @@ export function PatternInputPanel({
   ] = useState('')
 
   const [
+    shoulderLengthInput,
+    setShoulderLengthInput,
+  ] = useState('')
+
+  const [
     message,
     setMessage,
   ] = useState<string | null>(
@@ -111,13 +123,13 @@ export function PatternInputPanel({
   )
 
   /*
-   * PatternProject is the source of
-   * truth.
+   * PatternProject is the source
+   * of truth.
    *
-   * Undo, Redo, New, and Open may all
-   * replace measurements outside this
-   * component, so the visible inputs
-   * must follow the current project.
+   * Undo / Redo / New / Open can
+   * replace these values outside this
+   * component, so all inputs follow
+   * the current project.
    */
   useEffect(() => {
     if (
@@ -126,37 +138,50 @@ export function PatternInputPanel({
       setBackLengthInput('')
       setChestGirthInput('')
       setNeckGirthInput('')
-      setMessage(null)
+    } else {
+      const values =
+        bodyMeasurementsToCm(
+          measurements,
+        )
 
-      return
-    }
-
-    const values =
-      bodyMeasurementsToCm(
-        measurements,
+      setBackLengthInput(
+        formatInputNumber(
+          values.backLengthCm,
+        ),
       )
 
-    setBackLengthInput(
-      formatInputNumber(
-        values.backLengthCm,
-      ),
-    )
+      setChestGirthInput(
+        formatInputNumber(
+          values.chestGirthCm,
+        ),
+      )
 
-    setChestGirthInput(
-      formatInputNumber(
-        values.chestGirthCm,
-      ),
-    )
+      setNeckGirthInput(
+        formatInputNumber(
+          values.neckGirthCm,
+        ),
+      )
+    }
 
-    setNeckGirthInput(
-      formatInputNumber(
-        values.neckGirthCm,
-      ),
-    )
+    if (
+      shoulderLengthMm ===
+      null
+    ) {
+      setShoulderLengthInput('')
+    } else {
+      setShoulderLengthInput(
+        formatInputNumber(
+          mmToCm(
+            shoulderLengthMm,
+          ),
+        ),
+      )
+    }
 
     setMessage(null)
   }, [
     measurements,
+    shoulderLengthMm,
   ])
 
   const handleSubmit = (
@@ -184,6 +209,15 @@ export function PatternInputPanel({
           'Neck Girth',
         )
 
+      const shoulderLengthCm =
+        parseMeasurement(
+          shoulderLengthInput,
+          'Shoulder Length',
+        )
+
+      const shoulderLengthMm =
+        shoulderLengthCm * 10
+
       const nextMeasurements =
         createBodyMeasurementsFromCm({
           backLengthCm,
@@ -192,33 +226,53 @@ export function PatternInputPanel({
         })
 
       /*
-       * PAWTTERN keeps raw C unchanged.
+       * VIDEO REFERENCE 2
        *
-       * The project's explicit
-       * half-body allowance is passed
-       * to the formula engine separately.
+       * The V2 formula engine controls:
+       *
+       * W = C/2 + allowance
+       * U = W/5
+       * armhole level = B/5
+       *
+       * back arm guide =
+       * 2U + 0.5 cm
+       *
+       * common armpit =
+       * 3U
+       *
+       * front arm guide =
+       * 4U + 0.5 cm
+       *
+       * both shoulders =
+       * exactly 45 degrees
+       *
+       * Shoulder length remains an
+       * explicit numeric drafting
+       * parameter.
        */
       const construction =
-        createReferenceTankArmholeConstruction(
+        createReferenceTankV2Construction(
           nextMeasurements,
           {
             halfBodyAllowanceMm,
+            shoulderLengthMm,
           },
         )
 
       onGenerate(
         nextMeasurements,
+        shoulderLengthMm,
         construction.document,
       )
 
       setMessage(
-        'Base block generated.',
+        'Video-2 master block skeleton generated.',
       )
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : 'Unable to generate the base block.'
+          : 'Unable to generate the Video-2 master block.'
 
       setMessage(
         errorMessage,
@@ -262,7 +316,7 @@ export function PatternInputPanel({
                 marginTop: '2px',
               }}
             >
-              Dog measurements in cm
+              Video Reference 2 · measurements in cm
             </div>
           </div>
 
@@ -347,6 +401,43 @@ export function PatternInputPanel({
             />
           </label>
 
+          <label>
+            <div>
+              Shoulder Length
+            </div>
+
+            <input
+              type="number"
+              min="0.1"
+              step="0.1"
+              inputMode="decimal"
+              placeholder="e.g. 3.0"
+              value={
+                shoulderLengthInput
+              }
+              onChange={(
+                event,
+              ) =>
+                setShoulderLengthInput(
+                  event.target.value,
+                )
+              }
+              style={{
+                width: '90px',
+              }}
+            />
+
+            <div
+              style={{
+                fontSize: '10px',
+                marginTop: '2px',
+                maxWidth: '130px',
+              }}
+            >
+              Enter explicitly — no automatic size assignment
+            </div>
+          </label>
+
           <div
             style={{
               padding: '5px 8px',
@@ -357,7 +448,7 @@ export function PatternInputPanel({
               lineHeight: 1.35,
               background: '#fafafa',
             }}
-            title="Explicit reference-video body allowance. Raw Chest Girth C is unchanged."
+            title="Explicit body allowance. Raw Chest Girth C is unchanged."
           >
             <strong>
               Body allowance
@@ -378,10 +469,45 @@ export function PatternInputPanel({
             </div>
           </div>
 
+          <div
+            style={{
+              padding: '5px 8px',
+              border:
+                '1px solid #d7d7d7',
+              borderRadius: '4px',
+              fontSize: '12px',
+              lineHeight: 1.35,
+              background: '#fafafa',
+              maxWidth: '210px',
+            }}
+            title="Reference checkpoints only. These do not automatically classify the dog."
+          >
+            <strong>
+              Shoulder reference
+            </strong>
+
+            <div>
+              S 2.5 · M 3.0 · L 4.0 · XL 4.5 cm
+            </div>
+
+            <div>
+              Construction angle: 45°
+            </div>
+
+            <div
+              style={{
+                fontSize: '10px',
+                marginTop: '2px',
+              }}
+            >
+              checkpoints only — not automatic sizing
+            </div>
+          </div>
+
           <button
             type="submit"
           >
-            Generate Base Block
+            Generate V2 Base Block
           </button>
 
           {message && (
