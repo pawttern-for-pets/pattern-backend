@@ -1,9 +1,14 @@
 import {
+  addCurve,
   addLine,
   addPoint,
   createEmptyDocument,
   type PatternDocument,
 } from '../cad/document'
+
+import {
+  cubicBezierCurveLengthMm,
+} from '../cad/curves'
 
 import type {
   BodyMeasurements,
@@ -34,6 +39,27 @@ import {
  * Video 2 constructs the lower-body
  * shaping separately later.
  */
+
+export const
+  REFERENCE_TANK_V2_NECKLINE_LENGTH_SEGMENTS =
+    1000
+
+/*
+ * Cubic Bezier handle coefficient.
+ *
+ * PAWTTERN uses this as a stable
+ * deterministic handle-length factor.
+ *
+ * It is NOT claimed to be a handle
+ * formula stated in Video Reference 2.
+ */
+const QUARTER_ELLIPSE_KAPPA =
+  4 *
+  (
+    Math.sqrt(2) -
+    1
+  ) /
+  3
 
 export const REFERENCE_TANK_V2_POINT_IDS = {
   backNeckCenter:
@@ -108,17 +134,69 @@ export const REFERENCE_TANK_V2_LINE_IDS = {
     'V2_FRONT_SHOULDER',
 } as const
 
+export const REFERENCE_TANK_V2_CURVE_IDS = {
+  backNeckline:
+    'V2_BACK_NECKLINE',
+
+  frontNeckline:
+    'V2_FRONT_NECKLINE',
+} as const
+
+export interface ReferenceTankV2ConstructionOptions
+  extends ReferenceTankV2FormulaOptions {
+  /*
+   * Additional required relaxed
+   * neckline opening.
+   *
+   * This never changes raw Neck Girth.
+   */
+  neckOpeningAllowanceMm:
+    number
+}
+
+export interface ReferenceTankV2NecklineMetrics {
+  backHalfNeckLengthMm:
+    number
+
+  frontHalfNeckLengthMm:
+    number
+
+  finishedNeckOpeningMm:
+    number
+
+  minimumNeckOpeningMm:
+    number
+}
+
 export interface ReferenceTankV2Construction {
   formula:
     ReferenceTankV2Formula
+
+  neckline:
+    ReferenceTankV2NecklineMetrics
 
   document:
     PatternDocument
 }
 
 function validateV2Construction(
-  formula: ReferenceTankV2Formula,
+  formula:
+    ReferenceTankV2Formula,
+
+  neckOpeningAllowanceMm:
+    number,
 ): void {
+  if (
+    !Number.isFinite(
+      neckOpeningAllowanceMm,
+    ) ||
+    neckOpeningAllowanceMm < 0
+  ) {
+    throw new Error(
+      'V2 neck opening allowance must be a finite number greater than or equal to 0 mm.',
+    )
+  }
+
   /*
    * VIDEO 2:
    *
@@ -185,7 +263,7 @@ function validateV2Construction(
    */
   if (
     formula.frontNeckCenter.yMm >=
-    formula.armholeDepthMm
+      formula.armholeDepthMm
   ) {
     throw new Error(
       'V2 Front Neck Center must remain above the armhole-depth line.',
@@ -194,16 +272,28 @@ function validateV2Construction(
 }
 
 export function createReferenceTankV2Construction(
-  measurements: BodyMeasurements,
-  options: ReferenceTankV2FormulaOptions,
+  measurements:
+    BodyMeasurements,
+
+  options:
+    ReferenceTankV2ConstructionOptions,
 ): ReferenceTankV2Construction {
   const formula =
     createReferenceTankV2Formula(
       measurements,
-      options,
+      {
+        halfBodyAllowanceMm:
+          options.halfBodyAllowanceMm,
+
+        shoulderLengthMm:
+          options.shoulderLengthMm,
+      },
     )
 
-  validateV2Construction(formula)
+  validateV2Construction(
+    formula,
+    options.neckOpeningAllowanceMm,
+  )
 
   let document =
     createEmptyDocument()
@@ -212,14 +302,6 @@ export function createReferenceTankV2Construction(
    * --------------------------------
    * BACK CENTER
    * --------------------------------
-   *
-   * Origin:
-   *
-   * (0, 0)
-   *
-   * Back Length ends at:
-   *
-   * (0, B)
    */
 
   document =
@@ -274,14 +356,6 @@ export function createReferenceTankV2Construction(
         formula.armholeDepthMm,
     })
 
-  /*
-   * Video 2:
-   *
-   * Back armhole guide:
-   *
-   * 2W/5 + 0.5 cm
-   */
-
   document =
     addPoint(document, {
       id:
@@ -298,18 +372,6 @@ export function createReferenceTankV2Construction(
         formula.armholeDepthMm,
     })
 
-  /*
-   * Video 2:
-   *
-   * Common Armpit:
-   *
-   * X = 3W/5
-   * Y = B/5
-   *
-   * Both future armhole curves
-   * terminate here.
-   */
-
   document =
     addPoint(document, {
       id:
@@ -325,14 +387,6 @@ export function createReferenceTankV2Construction(
       yMm:
         formula.commonArmpit.yMm,
     })
-
-  /*
-   * Video 2:
-   *
-   * Front armhole guide:
-   *
-   * 4W/5 + 0.5 cm
-   */
 
   document =
     addPoint(document, {
@@ -371,13 +425,8 @@ export function createReferenceTankV2Construction(
    * BACK NECK
    * --------------------------------
    *
-   * Width:
-   *
-   * N / 4
-   *
-   * Rise:
-   *
-   * N / 8
+   * Width = N/4
+   * Rise  = N/8
    */
 
   document =
@@ -415,12 +464,6 @@ export function createReferenceTankV2Construction(
    * --------------------------------
    * BACK SHOULDER
    * --------------------------------
-   *
-   * Video 2:
-   *
-   * Exactly 45 degrees.
-   *
-   * RIGHT + DOWN
    */
 
   document =
@@ -461,10 +504,6 @@ export function createReferenceTankV2Construction(
         formula.frontNeckCenter.yMm,
     })
 
-  /*
-   * Horizontal N/5 guide base.
-   */
-
   document =
     addPoint(document, {
       id:
@@ -480,11 +519,6 @@ export function createReferenceTankV2Construction(
       yMm:
         formula.frontNeckCenter.yMm,
     })
-
-  /*
-   * N/10 upward from the
-   * front neck-width base.
-   */
 
   document =
     addPoint(document, {
@@ -506,12 +540,6 @@ export function createReferenceTankV2Construction(
    * --------------------------------
    * FRONT SHOULDER
    * --------------------------------
-   *
-   * Video 2:
-   *
-   * Exactly 45 degrees.
-   *
-   * LEFT + DOWN
    */
 
   document =
@@ -532,12 +560,207 @@ export function createReferenceTankV2Construction(
 
   /*
    * =================================
-   * CONSTRUCTION LINES
+   * V2 NECKLINE CURVES
    * =================================
+   *
+   * Video 2 supplies the neck
+   * construction rectangles.
+   *
+   * PAWTTERN supplies the deterministic
+   * cubic curve inside each rectangle.
+   *
+   * Center-neck tangent:
+   * horizontal.
+   *
+   * Side-neck tangent:
+   * 45 degrees toward the Side Neck.
+   *
+   * IMPORTANT:
+   *
+   * The neckline is NOT made tangent-
+   * continuous with the shoulder seam.
+   *
+   * Doing that here would force the
+   * neckline to overshoot above the
+   * Side Neck and then curl back into
+   * the point.
+   *
+   * Instead, the neckline approaches
+   * the Side Neck cleanly at 45°.
    */
 
+  const backNeckDx =
+    formula.backSideNeck.xMm -
+    formula.backNeckCenter.xMm
+
+  const backNeckDy =
+    formula.backNeckCenter.yMm -
+    formula.backSideNeck.yMm
+
+  document =
+    addCurve(document, {
+      id:
+        REFERENCE_TANK_V2_CURVE_IDS
+          .backNeckline,
+
+      name:
+        'V2 Back Neckline',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .backNeckCenter,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .backSideNeck,
+
+      control1: {
+        xMm:
+          formula.backNeckCenter.xMm +
+          QUARTER_ELLIPSE_KAPPA *
+            backNeckDx,
+
+        yMm:
+          formula.backNeckCenter.yMm,
+      },
+
+      control2: {
+        /*
+         * Back neckline approaches
+         * the Side Neck:
+         *
+         * RIGHT + UP
+         *
+         * dx = +h
+         * dy = -h
+         *
+         * therefore exactly 45°.
+         */
+        xMm:
+          formula.backSideNeck.xMm -
+          QUARTER_ELLIPSE_KAPPA *
+            backNeckDy,
+
+        yMm:
+          formula.backSideNeck.yMm +
+          QUARTER_ELLIPSE_KAPPA *
+            backNeckDy,
+      },
+    })
+
+  const frontNeckDx =
+    formula.frontSideNeck.xMm -
+    formula.frontNeckCenter.xMm
+
+  const frontNeckDy =
+    formula.frontNeckCenter.yMm -
+    formula.frontSideNeck.yMm
+
+  document =
+    addCurve(document, {
+      id:
+        REFERENCE_TANK_V2_CURVE_IDS
+          .frontNeckline,
+
+      name:
+        'V2 Front Neckline',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .frontNeckCenter,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .frontSideNeck,
+
+      control1: {
+        xMm:
+          formula.frontNeckCenter.xMm +
+          QUARTER_ELLIPSE_KAPPA *
+            frontNeckDx,
+
+        yMm:
+          formula.frontNeckCenter.yMm,
+      },
+
+      control2: {
+        /*
+         * Front neckline approaches
+         * the Side Neck:
+         *
+         * LEFT + UP
+         *
+         * dx = -h
+         * dy = -h
+         *
+         * therefore exactly 45°.
+         */
+        xMm:
+          formula.frontSideNeck.xMm +
+          QUARTER_ELLIPSE_KAPPA *
+            frontNeckDy,
+
+        yMm:
+          formula.frontSideNeck.yMm +
+          QUARTER_ELLIPSE_KAPPA *
+            frontNeckDy,
+      },
+    })
+
+  const backHalfNeckLengthMm =
+    cubicBezierCurveLengthMm(
+      document.curves[
+        REFERENCE_TANK_V2_CURVE_IDS
+          .backNeckline
+      ],
+      document.points,
+      REFERENCE_TANK_V2_NECKLINE_LENGTH_SEGMENTS,
+    )
+
+  const frontHalfNeckLengthMm =
+    cubicBezierCurveLengthMm(
+      document.curves[
+        REFERENCE_TANK_V2_CURVE_IDS
+          .frontNeckline
+      ],
+      document.points,
+      REFERENCE_TANK_V2_NECKLINE_LENGTH_SEGMENTS,
+    )
+
+  const finishedNeckOpeningMm =
+    2 *
+    (
+      backHalfNeckLengthMm +
+      frontHalfNeckLengthMm
+    )
+
+  const minimumNeckOpeningMm =
+    formula.neckGirthMm +
+    options.neckOpeningAllowanceMm
+
   /*
-   * Full Back Length reference.
+   * Hard MVP neckline rule:
+   *
+   * The generated relaxed neckline
+   * must never be smaller than the
+   * active minimum.
+   *
+   * Raw Neck Girth remains unchanged.
+   */
+  if (
+    finishedNeckOpeningMm +
+      0.001 <
+    minimumNeckOpeningMm
+  ) {
+    throw new Error(
+      `V2 generated neckline opening (${finishedNeckOpeningMm.toFixed(3)} mm) is smaller than the required minimum (${minimumNeckOpeningMm.toFixed(3)} mm).`,
+    )
+  }
+
+  /*
+   * =================================
+   * CONSTRUCTION LINES
+   * =================================
    */
 
   document =
@@ -557,17 +780,6 @@ export function createReferenceTankV2Construction(
         REFERENCE_TANK_V2_POINT_IDS
           .backBottom,
     })
-
-  /*
-   * Complete B/5 armhole-depth line.
-   *
-   * We deliberately use ONE line
-   * instead of artificially splitting
-   * it into "Back" and "Front".
-   *
-   * Video 2 treats the full width as
-   * one five-part construction.
-   */
 
   document =
     addLine(document, {
@@ -627,10 +839,6 @@ export function createReferenceTankV2Construction(
           .backSideNeck,
     })
 
-  /*
-   * BACK 45° SHOULDER
-   */
-
   document =
     addLine(document, {
       id:
@@ -651,10 +859,6 @@ export function createReferenceTankV2Construction(
 
   /*
    * FRONT CENTER NECK EXTENSION
-   *
-   * The line is drawn only between
-   * Front Neck Center and the B/5
-   * reference row.
    */
 
   document =
@@ -715,10 +919,6 @@ export function createReferenceTankV2Construction(
           .frontSideNeck,
     })
 
-  /*
-   * FRONT 45° SHOULDER
-   */
-
   document =
     addLine(document, {
       id:
@@ -739,6 +939,14 @@ export function createReferenceTankV2Construction(
 
   return {
     formula,
+
+    neckline: {
+      backHalfNeckLengthMm,
+      frontHalfNeckLengthMm,
+      finishedNeckOpeningMm,
+      minimumNeckOpeningMm,
+    },
+
     document,
   }
 }

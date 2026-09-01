@@ -32,6 +32,9 @@ interface PatternInputPanelProps {
   shoulderLengthMm:
     number | null
 
+  neckOpeningAllowanceMm:
+    number
+
   onGenerate: (
     measurements:
       BodyMeasurements,
@@ -39,12 +42,15 @@ interface PatternInputPanelProps {
     shoulderLengthMm:
       number,
 
+    neckOpeningAllowanceMm:
+      number,
+
     document:
       PatternDocument,
   ) => void
 }
 
-function parseMeasurement(
+function parsePositiveMeasurement(
   value: string,
   label: string,
 ): number {
@@ -64,6 +70,26 @@ function parseMeasurement(
   return parsed
 }
 
+function parseNonNegativeMeasurement(
+  value: string,
+  label: string,
+): number {
+  const parsed =
+    Number(value)
+
+  if (
+    value.trim() === '' ||
+    !Number.isFinite(parsed) ||
+    parsed < 0
+  ) {
+    throw new Error(
+      `${label} must be 0 cm or greater.`,
+    )
+  }
+
+  return parsed
+}
+
 function formatInputNumber(
   value: number,
 ): string {
@@ -73,12 +99,12 @@ function formatInputNumber(
 }
 
 function formatAllowanceCm(
-  halfBodyAllowanceMm:
+  allowanceMm:
     number,
 ): string {
   const cm =
     mmToCm(
-      halfBodyAllowanceMm,
+      allowanceMm,
     )
 
   const sign =
@@ -93,6 +119,7 @@ export function PatternInputPanel({
   measurements,
   halfBodyAllowanceMm,
   shoulderLengthMm,
+  neckOpeningAllowanceMm,
   onGenerate,
 }: PatternInputPanelProps) {
   const [
@@ -114,6 +141,11 @@ export function PatternInputPanel({
     shoulderLengthInput,
     setShoulderLengthInput,
   ] = useState('')
+
+  const [
+    neckOpeningAllowanceInput,
+    setNeckOpeningAllowanceInput,
+  ] = useState('0')
 
   const [
     message,
@@ -178,10 +210,19 @@ export function PatternInputPanel({
       )
     }
 
+    setNeckOpeningAllowanceInput(
+      formatInputNumber(
+        mmToCm(
+          neckOpeningAllowanceMm,
+        ),
+      ),
+    )
+
     setMessage(null)
   }, [
     measurements,
     shoulderLengthMm,
+    neckOpeningAllowanceMm,
   ])
 
   const handleSubmit = (
@@ -192,31 +233,40 @@ export function PatternInputPanel({
 
     try {
       const backLengthCm =
-        parseMeasurement(
+        parsePositiveMeasurement(
           backLengthInput,
           'Back Length',
         )
 
       const chestGirthCm =
-        parseMeasurement(
+        parsePositiveMeasurement(
           chestGirthInput,
           'Chest Girth',
         )
 
       const neckGirthCm =
-        parseMeasurement(
+        parsePositiveMeasurement(
           neckGirthInput,
           'Neck Girth',
         )
 
       const shoulderLengthCm =
-        parseMeasurement(
+        parsePositiveMeasurement(
           shoulderLengthInput,
           'Shoulder Length',
         )
 
+      const neckOpeningAllowanceCm =
+        parseNonNegativeMeasurement(
+          neckOpeningAllowanceInput,
+          'Neck Opening Allowance',
+        )
+
       const shoulderLengthMm =
         shoulderLengthCm * 10
+
+      const nextNeckOpeningAllowanceMm =
+        neckOpeningAllowanceCm * 10
 
       const nextMeasurements =
         createBodyMeasurementsFromCm({
@@ -225,48 +275,34 @@ export function PatternInputPanel({
           neckGirthCm,
         })
 
-      /*
-       * VIDEO REFERENCE 2
-       *
-       * The V2 formula engine controls:
-       *
-       * W = C/2 + allowance
-       * U = W/5
-       * armhole level = B/5
-       *
-       * back arm guide =
-       * 2U + 0.5 cm
-       *
-       * common armpit =
-       * 3U
-       *
-       * front arm guide =
-       * 4U + 0.5 cm
-       *
-       * both shoulders =
-       * exactly 45 degrees
-       *
-       * Shoulder length remains an
-       * explicit numeric drafting
-       * parameter.
-       */
       const construction =
         createReferenceTankV2Construction(
           nextMeasurements,
           {
             halfBodyAllowanceMm,
+
             shoulderLengthMm,
+
+            neckOpeningAllowanceMm:
+              nextNeckOpeningAllowanceMm,
           },
         )
 
       onGenerate(
         nextMeasurements,
         shoulderLengthMm,
+        nextNeckOpeningAllowanceMm,
         construction.document,
       )
 
       setMessage(
-        'Video-2 master block skeleton generated.',
+        `V2 block generated · neckline ${formatInputNumber(
+          mmToCm(
+            construction
+              .neckline
+              .finishedNeckOpeningMm,
+          ),
+        )} cm`,
       )
     } catch (error) {
       const errorMessage =
@@ -434,7 +470,44 @@ export function PatternInputPanel({
                 maxWidth: '130px',
               }}
             >
-              Enter explicitly — no automatic size assignment
+              Explicit — no automatic size assignment
+            </div>
+          </label>
+
+          <label>
+            <div>
+              Neck Opening +
+            </div>
+
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              inputMode="decimal"
+              placeholder="0"
+              value={
+                neckOpeningAllowanceInput
+              }
+              onChange={(
+                event,
+              ) =>
+                setNeckOpeningAllowanceInput(
+                  event.target.value,
+                )
+              }
+              style={{
+                width: '90px',
+              }}
+            />
+
+            <div
+              style={{
+                fontSize: '10px',
+                marginTop: '2px',
+                maxWidth: '130px',
+              }}
+            >
+              optional cm added to minimum opening
             </div>
           </label>
 

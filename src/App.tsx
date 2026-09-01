@@ -51,6 +51,7 @@ import {
   setDraftingRuleVersion,
   setPatternProjectDocument,
   setPatternProjectMeasurements,
+  setPatternProjectNeckOpeningAllowanceMm,
   setPatternProjectShoulderLengthMm,
 } from './pattern/project'
 
@@ -76,12 +77,6 @@ interface ProjectState {
   cleanSnapshot:
     CleanPatternProjectSnapshot
 
-  /*
-   * Real browser file handle.
-   *
-   * null means this new project has
-   * not yet been given a file.
-   */
   fileHandle:
     PawtternFileHandle | null
 
@@ -188,12 +183,6 @@ function App() {
   const patternDocument =
     patternProject.document
 
-  /*
-   * Dirty state is calculated by
-   * comparing the complete current
-   * PatternProject against the last
-   * successful Save/Open/New snapshot.
-   */
   const hasUnsavedChanges =
     useMemo(
       () =>
@@ -207,11 +196,6 @@ function App() {
       ],
     )
 
-  /*
-   * Warn before browser reload/close
-   * when real unsaved project changes
-   * exist.
-   */
   useEffect(() => {
     const handleBeforeUnload = (
       event: BeforeUnloadEvent,
@@ -290,26 +274,21 @@ function App() {
    *
    * raw B / C / N
    * shoulder length
+   * neck opening allowance
    * drafting rule version
-   * generated CAD document
+   * generated CAD geometry
    *
-   * All are committed together as ONE
+   * Everything is committed as ONE
    * PatternProject history action.
-   *
-   * This keeps:
-   *
-   * Undo
-   * Redo
-   * Save
-   * Open
-   *
-   * synchronized.
    */
   const handleGenerateBaseBlock = (
     measurements:
       BodyMeasurements,
 
     shoulderLengthMm:
+      number,
+
+    neckOpeningAllowanceMm:
       number,
 
     document:
@@ -332,6 +311,12 @@ function App() {
           setPatternProjectShoulderLengthMm(
             nextPatternProject,
             shoulderLengthMm,
+          )
+
+        nextPatternProject =
+          setPatternProjectNeckOpeningAllowanceMm(
+            nextPatternProject,
+            neckOpeningAllowanceMm,
           )
 
         nextPatternProject =
@@ -408,13 +393,6 @@ function App() {
       )
     }
 
-  /*
-   * NEW
-   *
-   * Creates a completely blank project
-   * and forgets the previous file
-   * handle.
-   */
   const handleNewPattern =
     () => {
       if (
@@ -457,15 +435,6 @@ function App() {
       )
     }
 
-  /*
-   * OPEN
-   *
-   * The opened FileSystemFileHandle is
-   * retained inside ProjectState.
-   *
-   * That is what later allows normal
-   * Save to update this exact file.
-   */
   const handleOpenPattern =
     async () => {
       if (
@@ -494,13 +463,6 @@ function App() {
           return
         }
 
-        /*
-         * Validation happens BEFORE
-         * current project state changes.
-         *
-         * A corrupt file therefore
-         * cannot destroy current work.
-         */
         const openedHistory =
           openPatternProjectHistoryFromJson(
             opened.text,
@@ -548,11 +510,6 @@ function App() {
       }
     }
 
-  /*
-   * Internal helper used by both
-   * Save and Save As after a real file
-   * handle has been chosen.
-   */
   const savePatternToHandle =
     async (
       handle:
@@ -565,10 +522,6 @@ function App() {
         json,
       )
 
-      /*
-       * Only mark the project clean
-       * AFTER the disk write succeeds.
-       */
       setProject(
         (currentProject) => ({
           ...currentProject,
@@ -592,16 +545,6 @@ function App() {
       )
     }
 
-  /*
-   * SAVE AS
-   *
-   * Always asks Windows for a new
-   * filename/location.
-   *
-   * After successful Save As, the new
-   * file becomes the current project
-   * file.
-   */
   const handleSaveAsPattern =
     async () => {
       if (
@@ -615,10 +558,6 @@ function App() {
       }
 
       try {
-        /*
-         * Validate before opening the
-         * Windows Save As dialog.
-         */
         const json =
           serializePatternProjectForSave(
             patternProject,
@@ -634,9 +573,6 @@ function App() {
             suggestedName,
           )
 
-        /*
-         * User pressed Cancel.
-         */
         if (!handle) {
           return
         }
@@ -657,15 +593,6 @@ function App() {
       }
     }
 
-  /*
-   * SAVE
-   *
-   * Existing file:
-   *   overwrite SAME file.
-   *
-   * New unsaved project:
-   *   first Save behaves like Save As.
-   */
   const handleSavePattern =
     async () => {
       if (
@@ -678,12 +605,6 @@ function App() {
         return
       }
 
-      /*
-       * Brand-new project.
-       *
-       * There is no Windows file yet,
-       * so first Save must ask for one.
-       */
       if (
         project.fileHandle ===
         null
@@ -699,14 +620,6 @@ function App() {
             patternProject,
           )
 
-        /*
-         * IMPORTANT:
-         *
-         * No file picker here.
-         *
-         * Write directly back to the
-         * existing file handle.
-         */
         await savePatternToHandle(
           project.fileHandle,
           json,
@@ -723,15 +636,6 @@ function App() {
       }
     }
 
-  /*
-   * PROJECT KEYBOARD SHORTCUTS
-   *
-   * Ctrl + S
-   *   -> PAWTTERN Save
-   *
-   * Ctrl + Shift + S
-   *   -> PAWTTERN Save As
-   */
   useEffect(() => {
     const handleProjectShortcut = (
       event: KeyboardEvent,
@@ -749,10 +653,6 @@ function App() {
         return
       }
 
-      /*
-       * Stop Chrome from trying to
-       * save the PAWTTERN web page.
-       */
       event.preventDefault()
 
       if (event.shiftKey) {
@@ -946,6 +846,10 @@ function App() {
           patternProject
             .shoulderLengthMm
         }
+        neckOpeningAllowanceMm={
+          patternProject
+            .neckOpeningAllowanceMm
+        }
         onGenerate={
           handleGenerateBaseBlock
         }
@@ -953,16 +857,6 @@ function App() {
 
       <main className="workspace">
         <CadCanvas
-          /*
-           * New/Open remounts the
-           * canvas to clear temporary:
-           *
-           * selection
-           * unfinished lines
-           * unfinished curves
-           * measurements
-           * drag state
-           */
           key={
             project.sessionId
           }
