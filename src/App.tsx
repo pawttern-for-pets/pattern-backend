@@ -57,6 +57,10 @@ import {
 } from './pattern/referenceTankV2Formula'
 
 import {
+  validateReferenceTankV2DocumentEdit,
+} from './pattern/referenceTankV2EditValidation'
+
+import {
   isFileSystemAccessSupported,
   pickPatternFileToOpen,
   pickPatternFileToSave,
@@ -223,10 +227,47 @@ function App() {
     hasUnsavedChanges,
   ])
 
+  /*
+   * ALL CAD DOCUMENT EDITS PASS HERE.
+   *
+   * CadCanvas remains a generic CAD
+   * component.
+   *
+   * PAWTTERN-specific pattern rules
+   * are enforced here before geometry
+   * is allowed into PatternProject
+   * history.
+   */
   const handleDocumentChange = (
     nextDocument:
       PatternDocument,
   ) => {
+    const validation =
+      validateReferenceTankV2DocumentEdit(
+        patternProject,
+        nextDocument,
+      )
+
+    /*
+     * INVALID EDIT
+     *
+     * Do NOT change project state.
+     * Do NOT create an Undo step.
+     *
+     * CadCanvas will fall back to the
+     * existing valid PatternDocument.
+     */
+    if (
+      !validation.isValid
+    ) {
+      setProjectMessage(
+        validation.message ??
+        'Pattern edit rejected.',
+      )
+
+      return
+    }
+
     setProject(
       (currentProject) => {
         const currentPatternProject =
@@ -774,6 +815,15 @@ function App() {
             style={{
               fontSize:
                 '12px',
+
+              color:
+                projectMessage
+                  .toLowerCase()
+                  .includes(
+                    'rejected',
+                  )
+                  ? '#b00020'
+                  : undefined,
             }}
           >
             {projectMessage}

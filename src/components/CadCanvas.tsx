@@ -2412,54 +2412,25 @@ export function CadCanvas({
         )
       }
 
-      const nextCurve =
-        nextDocument.curves[
-          selection.id
-        ]
-
-      if (nextCurve) {
-        const control =
-          nextCurve[
-            handle
-          ]
-
-        const displayed =
-          worldCoordinatesToDisplay(
-            control,
-            unit,
-          )
-
-        if (
-          handle ===
-          'control1'
-        ) {
-          setControl1XInput(
-            formatCoordinateInput(
-              displayed.x,
-            ),
-          )
-
-          setControl1YInput(
-            formatCoordinateInput(
-              displayed.y,
-            ),
-          )
-        } else {
-          setControl2XInput(
-            formatCoordinateInput(
-              displayed.x,
-            ),
-          )
-
-          setControl2YInput(
-            formatCoordinateInput(
-              displayed.y,
-            ),
-          )
-        }
-      }
-
-      setCurveControlError(null)
+      /*
+       * IMPORTANT:
+       *
+       * Do not copy values from the
+       * candidate nextDocument here.
+       *
+       * PAWTTERN may reject that document
+       * at the pattern-validation boundary.
+       *
+       * Reset to the currently accepted
+       * PatternDocument instead.
+       *
+       * If the edit was valid, the parent
+       * will supply the newly accepted
+       * document and the existing useEffect
+       * will then synchronize these inputs
+       * to the new valid coordinates.
+       */
+      resetCurveControlInputs()
     } catch {
       setCurveControlError(
         'Could not apply that control position.',
