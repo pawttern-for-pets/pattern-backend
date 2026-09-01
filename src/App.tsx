@@ -48,11 +48,8 @@ import {
 } from './pattern/projectLifecycle'
 
 import {
-  setDraftingRuleVersion,
   setPatternProjectDocument,
-  setPatternProjectMeasurements,
-  setPatternProjectNeckOpeningAllowanceMm,
-  setPatternProjectShoulderLengthMm,
+  setPatternProjectGeneratedBlock,
 } from './pattern/project'
 
 import {
@@ -270,9 +267,11 @@ function App() {
   /*
    * GENERATE VIDEO-2 MASTER BLOCK
    *
-   * One Generate action stores:
+   * One Generate action stores every
+   * parameter that produced the geometry:
    *
    * raw B / C / N
+   * half-body allowance
    * shoulder length
    * neck opening allowance
    * drafting rule version
@@ -284,6 +283,9 @@ function App() {
   const handleGenerateBaseBlock = (
     measurements:
       BodyMeasurements,
+
+    halfBodyAllowanceMm:
+      number,
 
     shoulderLengthMm:
       number,
@@ -301,34 +303,23 @@ function App() {
             .patternHistory
             .present
 
-        let nextPatternProject =
-          setPatternProjectMeasurements(
+        const nextPatternProject =
+          setPatternProjectGeneratedBlock(
             currentPatternProject,
-            measurements,
-          )
+            {
+              measurements,
 
-        nextPatternProject =
-          setPatternProjectShoulderLengthMm(
-            nextPatternProject,
-            shoulderLengthMm,
-          )
+              halfBodyAllowanceMm,
 
-        nextPatternProject =
-          setPatternProjectNeckOpeningAllowanceMm(
-            nextPatternProject,
-            neckOpeningAllowanceMm,
-          )
+              shoulderLengthMm,
 
-        nextPatternProject =
-          setDraftingRuleVersion(
-            nextPatternProject,
-            PAWTTERN_MASTER_V2_RULE_VERSION,
-          )
+              neckOpeningAllowanceMm,
 
-        nextPatternProject =
-          setPatternProjectDocument(
-            nextPatternProject,
-            document,
+              draftingRuleVersion:
+                PAWTTERN_MASTER_V2_RULE_VERSION,
+
+              document,
+            },
           )
 
         return {

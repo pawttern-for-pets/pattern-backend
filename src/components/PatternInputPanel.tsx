@@ -39,6 +39,9 @@ interface PatternInputPanelProps {
     measurements:
       BodyMeasurements,
 
+    halfBodyAllowanceMm:
+      number,
+
     shoulderLengthMm:
       number,
 
@@ -288,8 +291,16 @@ export function PatternInputPanel({
           },
         )
 
+      /*
+       * Pass every parameter that
+       * produced this geometry.
+       *
+       * App stores them atomically
+       * with the generated document.
+       */
       onGenerate(
         nextMeasurements,
+        halfBodyAllowanceMm,
         shoulderLengthMm,
         nextNeckOpeningAllowanceMm,
         construction.document,
