@@ -38,15 +38,32 @@ export interface ReferenceTankV2FormulaOptions {
    * Explicit shoulder length.
    *
    * This must NOT be automatically
-   * inferred from nominal S/M/L sizes yet.
-   *
-   * Reference checkpoints currently used:
-   * S  = 25 mm
-   * M  = 30 mm
-   * L  = 40 mm
-   * XL = 45 mm
+   * inferred from nominal S/M/L sizes.
    */
   shoulderLengthMm:
+    number
+
+  /*
+   * INTERNAL PAWTTERN PARAMETER.
+   *
+   * Default = 1.
+   *
+   * Video-2 neck proportions remain
+   * unchanged at scale 1.
+   *
+   * Values above 1 proportionally
+   * enlarge:
+   *
+   * Back N/4 and N/8
+   * Front N/5 and N/10
+   *
+   * Raw Neck Girth N is NEVER changed.
+   *
+   * The user does not manually choose
+   * this value. The neckline fitting
+   * engine will calculate it.
+   */
+  neckGeometryScale?:
     number
 }
 
@@ -79,6 +96,15 @@ export interface ReferenceTankV2Formula {
     number
 
   shoulderLengthMm:
+    number
+
+  /*
+   * Internal PAWTTERN neckline
+   * geometry multiplier.
+   *
+   * Dimensionless.
+   */
+  neckGeometryScale:
     number
 
   shoulderAngleDeg:
@@ -202,6 +228,29 @@ function validateOptions(
       'Shoulder length must be greater than 0 mm.',
     )
   }
+
+  const neckGeometryScale =
+    options.neckGeometryScale ??
+    1
+
+  /*
+   * PAWTTERN currently permits only
+   * enlargement of the source neck
+   * geometry.
+   *
+   * We do not automatically shrink
+   * below the Video-2 base geometry.
+   */
+  if (
+    !isFiniteNumber(
+      neckGeometryScale,
+    ) ||
+    neckGeometryScale < 1
+  ) {
+    throw new Error(
+      'Neck geometry scale must be a finite number greater than or equal to 1.',
+    )
+  }
 }
 
 export function createReferenceTankV2Formula(
@@ -229,6 +278,10 @@ export function createReferenceTankV2Formula(
     halfBodyAllowanceMm,
     shoulderLengthMm,
   } = options
+
+  const neckGeometryScale =
+    options.neckGeometryScale ??
+    1
 
   /*
    * VIDEO 2
@@ -295,29 +348,37 @@ export function createReferenceTankV2Formula(
     }
 
   /*
-   * Back side-neck:
+   * VIDEO-2 BASE:
    *
    * width = N/4
    * rise  = N/8
+   *
+   * PAWTTERN may proportionally
+   * enlarge those dimensions using
+   * neckGeometryScale.
+   *
+   * Raw N remains untouched.
    */
   const backSideNeck:
     PatternPointMm = {
       xMm:
-        neckGirthMm / 4,
+        (
+          neckGirthMm / 4
+        ) *
+        neckGeometryScale,
 
       yMm:
-        -neckGirthMm / 8,
+        -(
+          neckGirthMm / 8
+        ) *
+        neckGeometryScale,
     }
 
   /*
    * VIDEO 2 SHOULDER
    *
-   * Both shoulders are exactly 45 degrees.
-   *
-   * At 45 degrees:
-   *
-   * dx = L / sqrt(2)
-   * dy = L / sqrt(2)
+   * Both shoulders are exactly
+   * 45 degrees.
    */
   const shoulderDeltaMm =
     shoulderLengthMm /
@@ -360,14 +421,9 @@ export function createReferenceTankV2Formula(
    *
    * Video 2:
    *
-   * rise upward from armhole-depth line:
+   * rise upward from armhole-depth:
    *
    * B/2 - 1 cm
-   *
-   * Therefore:
-   *
-   * Y =
-   * B/5 - (B/2 - 10 mm)
    */
   const frontNeckCenterY =
     armholeDepthMm -
@@ -386,20 +442,29 @@ export function createReferenceTankV2Formula(
     }
 
   /*
-   * FRONT SIDE-NECK
+   * VIDEO-2 BASE:
    *
-   * width = N/5 toward the left
+   * width = N/5 toward left
    * rise  = N/10 upward
+   *
+   * PAWTTERN applies the same
+   * proportional neckGeometryScale.
    */
   const frontSideNeck:
     PatternPointMm = {
       xMm:
         halfBodyWidthMm -
-        neckGirthMm / 5,
+        (
+          neckGirthMm / 5
+        ) *
+        neckGeometryScale,
 
       yMm:
         frontNeckCenterY -
-        neckGirthMm / 10,
+        (
+          neckGirthMm / 10
+        ) *
+        neckGeometryScale,
     }
 
   /*
@@ -407,11 +472,6 @@ export function createReferenceTankV2Formula(
    *
    * From Front Side-Neck:
    * LEFT + DOWN
-   *
-   * This is NOT a full mirror
-   * of the back because the front
-   * neck construction has its own
-   * vertical position.
    */
   const frontShoulderOuter:
     PatternPointMm = {
@@ -437,6 +497,8 @@ export function createReferenceTankV2Formula(
     halfBodyAllowanceMm,
 
     shoulderLengthMm,
+
+    neckGeometryScale,
 
     shoulderAngleDeg:
       45,

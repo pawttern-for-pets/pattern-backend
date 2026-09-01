@@ -33,11 +33,9 @@ describe(
      *
      * +1 cm half-body allowance
      *
-     * shoulder length = 3 cm
-     * using the M reference checkpoint.
+     * shoulder length = 3 cm.
      *
-     * This does NOT mean B22/C36/N27
-     * is automatically classified M.
+     * No nominal size is assigned.
      */
     const options = {
       halfBodyAllowanceMm:
@@ -69,6 +67,21 @@ describe(
     )
 
     it(
+      'uses the unscaled Video-2 neck geometry by default',
+      () => {
+        const result =
+          createReferenceTankV2Formula(
+            measurements,
+            options,
+          )
+
+        expect(
+          result.neckGeometryScale,
+        ).toBe(1)
+      },
+    )
+
+    it(
       'calculates the Video-2 half-body width and fifth',
       () => {
         const result =
@@ -77,13 +90,6 @@ describe(
             options,
           )
 
-        /*
-         * C = 36 cm
-         *
-         * W =
-         * 36/2 + 1
-         * = 19 cm
-         */
         expect(
           result.halfBodyWidthMm,
         ).toBe(190)
@@ -103,11 +109,6 @@ describe(
             options,
           )
 
-        /*
-         * B = 22 cm
-         *
-         * B/5 = 4.4 cm
-         */
         expect(
           result.armholeDepthMm,
         ).toBe(44)
@@ -123,21 +124,6 @@ describe(
             options,
           )
 
-        /*
-         * U = 3.8 cm
-         *
-         * Back guide:
-         * 2U + 0.5
-         * = 8.1 cm
-         *
-         * Common armpit:
-         * 3U
-         * = 11.4 cm
-         *
-         * Front guide:
-         * 4U + 0.5
-         * = 15.7 cm
-         */
         expect(
           result.backArmGuideXMm,
         ).toBe(81)
@@ -163,7 +149,7 @@ describe(
     )
 
     it(
-      'constructs the back side-neck from N/4 and N/8',
+      'constructs the default back side-neck from N/4 and N/8',
       () => {
         const result =
           createReferenceTankV2Formula(
@@ -171,12 +157,6 @@ describe(
             options,
           )
 
-        /*
-         * N = 27 cm
-         *
-         * N/4 = 6.75 cm
-         * N/8 = 3.375 cm
-         */
         expect(
           result.backSideNeck.xMm,
         ).toBeCloseTo(
@@ -235,7 +215,7 @@ describe(
     )
 
     it(
-      'constructs the Video-2 front neck geometry',
+      'constructs the default Video-2 front neck geometry',
       () => {
         const result =
           createReferenceTankV2Formula(
@@ -243,14 +223,6 @@ describe(
             options,
           )
 
-        /*
-         * Front center Y:
-         *
-         * B/5 - (B/2 - 1cm)
-         *
-         * 4.4 - (11 - 1)
-         * = -5.6 cm
-         */
         expect(
           result.frontNeckCenter,
         ).toEqual({
@@ -261,17 +233,6 @@ describe(
             -56,
         })
 
-        /*
-         * Front side-neck:
-         *
-         * X =
-         * 19 - 27/5
-         * = 13.6 cm
-         *
-         * Y =
-         * -5.6 - 27/10
-         * = -8.3 cm
-         */
         expect(
           result.frontSideNeck.xMm,
         ).toBeCloseTo(
@@ -315,29 +276,18 @@ describe(
           8,
         )
 
-        /*
-         * Front shoulder travels LEFT.
-         */
         expect(
           result.frontShoulderOuter.xMm,
         ).toBeLessThan(
           result.frontSideNeck.xMm,
         )
 
-        /*
-         * Y+ means visually DOWN.
-         */
         expect(
           result.frontShoulderOuter.yMm,
         ).toBeGreaterThan(
           result.frontSideNeck.yMm,
         )
 
-        /*
-         * With the 3 cm reference shoulder,
-         * the point naturally falls very near
-         * the 3/5 common-armpit X position.
-         */
         expect(
           result.frontShoulderOuter.xMm,
         ).toBeCloseTo(
@@ -348,7 +298,181 @@ describe(
     )
 
     it(
-      'does not mutate the raw body measurements',
+      'proportionally enlarges all four neck construction dimensions',
+      () => {
+        const result =
+          createReferenceTankV2Formula(
+            measurements,
+            {
+              ...options,
+              neckGeometryScale:
+                1.1,
+            },
+          )
+
+        /*
+         * BACK
+         *
+         * N/4 = 67.5
+         * N/8 = 33.75
+         *
+         * × 1.1
+         */
+        expect(
+          result.backSideNeck.xMm,
+        ).toBeCloseTo(
+          74.25,
+          8,
+        )
+
+        expect(
+          result.backSideNeck.yMm,
+        ).toBeCloseTo(
+          -37.125,
+          8,
+        )
+
+        /*
+         * FRONT
+         *
+         * N/5 = 54
+         * N/10 = 27
+         *
+         * × 1.1
+         */
+        expect(
+          result.frontSideNeck.xMm,
+        ).toBeCloseTo(
+          130.6,
+          8,
+        )
+
+        expect(
+          result.frontSideNeck.yMm,
+        ).toBeCloseTo(
+          -85.7,
+          8,
+        )
+
+        expect(
+          result.neckGeometryScale,
+        ).toBeCloseTo(
+          1.1,
+          8,
+        )
+      },
+    )
+
+    it(
+      'keeps shoulder length and 45 degree direction after neck geometry enlargement',
+      () => {
+        const result =
+          createReferenceTankV2Formula(
+            measurements,
+            {
+              ...options,
+              neckGeometryScale:
+                1.1,
+            },
+          )
+
+        const backDx =
+          result
+            .backShoulderOuter
+            .xMm -
+          result
+            .backSideNeck
+            .xMm
+
+        const backDy =
+          result
+            .backShoulderOuter
+            .yMm -
+          result
+            .backSideNeck
+            .yMm
+
+        const frontDx =
+          result
+            .frontSideNeck
+            .xMm -
+          result
+            .frontShoulderOuter
+            .xMm
+
+        const frontDy =
+          result
+            .frontShoulderOuter
+            .yMm -
+          result
+            .frontSideNeck
+            .yMm
+
+        expect(
+          backDx,
+        ).toBeCloseTo(
+          backDy,
+          8,
+        )
+
+        expect(
+          frontDx,
+        ).toBeCloseTo(
+          frontDy,
+          8,
+        )
+
+        expect(
+          Math.hypot(
+            backDx,
+            backDy,
+          ),
+        ).toBeCloseTo(
+          30,
+          8,
+        )
+
+        expect(
+          Math.hypot(
+            frontDx,
+            frontDy,
+          ),
+        ).toBeCloseTo(
+          30,
+          8,
+        )
+      },
+    )
+
+    it(
+      'does not mutate raw Neck Girth when neck geometry is enlarged',
+      () => {
+        const result =
+          createReferenceTankV2Formula(
+            measurements,
+            {
+              ...options,
+              neckGeometryScale:
+                1.25,
+            },
+          )
+
+        expect(
+          result.neckGirthMm,
+        ).toBe(270)
+
+        expect(
+          measurements.neckGirthMm,
+        ).toBe(270)
+
+        expect(
+          result.neckGeometryScale,
+        ).toBe(1.25)
+      },
+    )
+
+    it(
+      'does not mutate the other raw body measurements',
       () => {
         const result =
           createReferenceTankV2Formula(
@@ -406,6 +530,37 @@ describe(
         ).toThrow(
           'Shoulder length must be greater than 0 mm.',
         )
+      },
+    )
+
+    it(
+      'rejects neck geometry shrinkage below the Video-2 base',
+      () => {
+        expect(() =>
+          createReferenceTankV2Formula(
+            measurements,
+            {
+              ...options,
+
+              neckGeometryScale:
+                0.99,
+            },
+          ),
+        ).toThrow(
+          'Neck geometry scale must be a finite number greater than or equal to 1.',
+        )
+
+        expect(() =>
+          createReferenceTankV2Formula(
+            measurements,
+            {
+              ...options,
+
+              neckGeometryScale:
+                Number.NaN,
+            },
+          ),
+        ).toThrow()
       },
     )
   },

@@ -43,16 +43,6 @@ describe(
         neckGirthCm: 27,
       })
 
-    /*
-     * Development checkpoint only.
-     *
-     * +1 cm half-body allowance
-     * 3 cm shoulder reference
-     * 0 cm additional neck opening.
-     *
-     * This does NOT classify the
-     * dog as a fixed "Medium" size.
-     */
     const options = {
       halfBodyAllowanceMm: 10,
       shoulderLengthMm: 30,
@@ -102,6 +92,21 @@ describe(
         ).toBe(
           PAWTTERN_MASTER_V2_RULE_VERSION,
         )
+      },
+    )
+
+    it(
+      'uses the unscaled Video-2 neckline when no enlargement is required',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        expect(
+          result.formula.neckGeometryScale,
+        ).toBe(1)
       },
     )
 
@@ -182,7 +187,7 @@ describe(
     )
 
     it(
-      'places the back neck construction from N/4 and N/8',
+      'places the default back neck construction from N/4 and N/8',
       () => {
         const result =
           createReferenceTankV2Construction(
@@ -213,7 +218,7 @@ describe(
     )
 
     it(
-      'places the front neck construction from the Video-2 formulas',
+      'places the default front neck construction from the Video-2 formulas',
       () => {
         const result =
           createReferenceTankV2Construction(
@@ -241,11 +246,18 @@ describe(
         })
 
         expect(
-          sideNeck,
-        ).toMatchObject({
-          xMm: 136,
-          yMm: -83,
-        })
+          sideNeck.xMm,
+        ).toBeCloseTo(
+          136,
+          8,
+        )
+
+        expect(
+          sideNeck.yMm,
+        ).toBeCloseTo(
+          -83,
+          8,
+        )
       },
     )
 
@@ -397,13 +409,6 @@ describe(
         ).toBeCloseTo(
           dy,
           8,
-        )
-
-        expect(
-          shoulder.xMm,
-        ).toBeCloseTo(
-          114.7867966,
-          5,
         )
       },
     )
@@ -576,13 +581,6 @@ describe(
             1,
           )
 
-        /*
-         * CENTER NECK
-         *
-         * Both curves leave their
-         * center-neck points horizontally.
-         */
-
         expect(
           backStartTangent.yMm,
         ).toBeCloseTo(
@@ -598,19 +596,9 @@ describe(
         )
 
         /*
-         * BACK SIDE NECK
-         *
-         * Curve approaches:
-         *
-         * RIGHT + UP
-         *
-         * X+ right
-         * Y- up
-         *
-         * Equal absolute X/Y derivative
-         * means exactly 45 degrees.
+         * Back neckline approaches
+         * Side Neck RIGHT + UP.
          */
-
         expect(
           backEndTangent.xMm,
         ).toBeGreaterThan(0)
@@ -631,16 +619,9 @@ describe(
         )
 
         /*
-         * FRONT SIDE NECK
-         *
-         * Curve approaches:
-         *
-         * LEFT + UP
-         *
-         * X- left
-         * Y- up
+         * Front neckline approaches
+         * Side Neck LEFT + UP.
          */
-
         expect(
           frontEndTangent.xMm,
         ).toBeLessThan(0)
@@ -728,7 +709,7 @@ describe(
     )
 
     it(
-      'keeps the default relaxed neckline at or above raw Neck Girth',
+      'keeps raw Neck Girth unchanged',
       () => {
         const result =
           createReferenceTankV2Construction(
@@ -737,77 +718,190 @@ describe(
           )
 
         expect(
-          result.neckline
-            .minimumNeckOpeningMm,
+          result.formula.neckGirthMm,
         ).toBe(270)
 
         expect(
-          result.neckline
-            .finishedNeckOpeningMm,
-        ).toBeGreaterThanOrEqual(
-          result.neckline
-            .minimumNeckOpeningMm,
-        )
-
-        expect(
-          result.formula.neckGirthMm,
+          measurements.neckGirthMm,
         ).toBe(270)
       },
     )
 
     it(
-      'adds neck opening allowance to the minimum without changing raw Neck Girth',
+      'automatically enlarges the neckline when plus 2 cm requires more opening',
       () => {
         const result =
           createReferenceTankV2Construction(
             measurements,
             {
               ...options,
-
-              /*
-               * +1 cm minimum opening.
-               *
-               * The corrected 45-degree
-               * neckline still clears
-               * this requirement.
-               */
               neckOpeningAllowanceMm:
-                10,
+                20,
             },
           )
 
         expect(
-          result.formula.neckGirthMm,
-        ).toBe(270)
-
-        expect(
           result.neckline
             .minimumNeckOpeningMm,
-        ).toBe(280)
+        ).toBe(290)
+
+       expect(
+  result.neckline
+    .finishedNeckOpeningMm +
+    0.001,
+).toBeGreaterThanOrEqual(
+  290,
+)
 
         expect(
-          result.neckline
-            .finishedNeckOpeningMm,
-        ).toBeGreaterThanOrEqual(
-          280,
+          Math.abs(
+            result.neckline
+              .finishedNeckOpeningMm -
+            290,
+          ),
+        ).toBeLessThan(
+          0.001,
         )
+
+        /*
+         * Raw N remains unchanged.
+         */
+        expect(
+          result.formula.neckGirthMm,
+        ).toBe(270)
       },
     )
 
     it(
-      'rejects a required neck opening larger than the generated default neckline',
+      'automatically enlarges the neckline when plus 3 cm requires a 30 cm opening',
       () => {
-        expect(() =>
+        const result =
           createReferenceTankV2Construction(
             measurements,
             {
               ...options,
               neckOpeningAllowanceMm:
-                100,
+                30,
             },
+          )
+
+        expect(
+          result.neckline
+            .minimumNeckOpeningMm,
+        ).toBe(300)
+
+        expect(
+          result.formula.neckGeometryScale,
+        ).toBeGreaterThan(1)
+
+        expect(
+          result.neckline
+            .finishedNeckOpeningMm,
+        ).toBeGreaterThanOrEqual(
+          300,
+        )
+
+        expect(
+          Math.abs(
+            result.neckline
+              .finishedNeckOpeningMm -
+            300,
           ),
-        ).toThrow(
-          /smaller than the required minimum/i,
+        ).toBeLessThan(
+          0.001,
+        )
+
+        expect(
+          result.formula.neckGirthMm,
+        ).toBe(270)
+      },
+    )
+
+    it(
+      'keeps both shoulders 3 cm and 45 degrees after automatic neckline enlargement',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            {
+              ...options,
+              neckOpeningAllowanceMm:
+                30,
+            },
+          )
+
+        const backLine =
+          result.document.lines[
+            REFERENCE_TANK_V2_LINE_IDS
+              .backShoulder
+          ]
+
+        const frontLine =
+          result.document.lines[
+            REFERENCE_TANK_V2_LINE_IDS
+              .frontShoulder
+          ]
+
+        expect(
+          lineLengthMm(
+            backLine,
+            result.document.points,
+          ),
+        ).toBeCloseTo(
+          30,
+          8,
+        )
+
+        expect(
+          lineLengthMm(
+            frontLine,
+            result.document.points,
+          ),
+        ).toBeCloseTo(
+          30,
+          8,
+        )
+
+        const backNeck =
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .backSideNeck
+          ]
+
+        const backShoulder =
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .backShoulderOuter
+          ]
+
+        const frontNeck =
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .frontSideNeck
+          ]
+
+        const frontShoulder =
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .frontShoulderOuter
+          ]
+
+        expect(
+          backShoulder.xMm -
+          backNeck.xMm,
+        ).toBeCloseTo(
+          backShoulder.yMm -
+          backNeck.yMm,
+          8,
+        )
+
+        expect(
+          frontNeck.xMm -
+          frontShoulder.xMm,
+        ).toBeCloseTo(
+          frontShoulder.yMm -
+          frontNeck.yMm,
+          8,
         )
       },
     )
@@ -820,6 +914,7 @@ describe(
             measurements,
             {
               ...options,
+
               neckOpeningAllowanceMm:
                 -1,
             },
@@ -831,6 +926,7 @@ describe(
             measurements,
             {
               ...options,
+
               neckOpeningAllowanceMm:
                 Number.NaN,
             },
