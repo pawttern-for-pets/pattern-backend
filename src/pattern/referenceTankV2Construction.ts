@@ -43,6 +43,10 @@ export const
   REFERENCE_TANK_V2_NECKLINE_LENGTH_SEGMENTS =
     1000
 
+export const
+  REFERENCE_TANK_V2_ARMHOLE_LENGTH_SEGMENTS =
+    1000
+
 const QUARTER_ELLIPSE_KAPPA =
   4 *
   (
@@ -70,11 +74,17 @@ export const REFERENCE_TANK_V2_POINT_IDS = {
   backArmGuide:
     'V2_BACK_ARM_GUIDE',
 
+  backArmholePivot:
+    'V2_BACK_ARMHOLE_PIVOT',
+
   commonArmpit:
     'V2_COMMON_ARMPIT',
 
   frontArmGuide:
     'V2_FRONT_ARM_GUIDE',
+
+  frontArmholePivot:
+    'V2_FRONT_ARMHOLE_PIVOT',
 
   frontArmholeLevel:
     'V2_FRONT_ARMHOLE_LEVEL',
@@ -130,6 +140,18 @@ export const REFERENCE_TANK_V2_CURVE_IDS = {
 
   frontNeckline:
     'V2_FRONT_NECKLINE',
+
+  backArmholeShoulderToPivot:
+    'V2_BACK_ARMHOLE_SHOULDER_TO_PIVOT',
+
+  backArmholePivotToCommon:
+    'V2_BACK_ARMHOLE_PIVOT_TO_COMMON',
+
+  frontArmholeCommonToPivot:
+    'V2_FRONT_ARMHOLE_COMMON_TO_PIVOT',
+
+  frontArmholePivotToShoulder:
+    'V2_FRONT_ARMHOLE_PIVOT_TO_SHOULDER',
 } as const
 
 export interface ReferenceTankV2ConstructionOptions
@@ -152,12 +174,32 @@ export interface ReferenceTankV2NecklineMetrics {
     number
 }
 
+export interface ReferenceTankV2ArmholeMetrics {
+  /*
+   * Seam-line geometry only.
+   *
+   * No seam allowance or arbitrary
+   * fit/safety threshold is applied.
+   */
+  backArmholeLengthMm:
+    number
+
+  frontArmholeLengthMm:
+    number
+
+  oneSideArmholeOpeningMm:
+    number
+}
+
 export interface ReferenceTankV2Construction {
   formula:
     ReferenceTankV2Formula
 
   neckline:
     ReferenceTankV2NecklineMetrics
+
+  armhole:
+    ReferenceTankV2ArmholeMetrics
 
   document:
     PatternDocument
@@ -175,6 +217,638 @@ interface NecklineControls {
 
   frontControl2:
     WorldPosition
+}
+
+interface CubicSegmentControls {
+  control1:
+    WorldPosition
+
+  control2:
+    WorldPosition
+}
+
+interface NaturalSplineSegment
+  extends CubicSegmentControls {
+  start:
+    WorldPosition
+
+  end:
+    WorldPosition
+}
+
+function distanceMm(
+  first:
+    WorldPosition,
+
+  second:
+    WorldPosition,
+): number {
+  return Math.hypot(
+    second.xMm -
+      first.xMm,
+
+    second.yMm -
+      first.yMm,
+  )
+}
+
+function addScaledPosition(
+  base:
+    WorldPosition,
+
+  direction:
+    WorldPosition,
+
+  scale:
+    number,
+): WorldPosition {
+  return {
+    xMm:
+      base.xMm +
+      direction.xMm *
+        scale,
+
+    yMm:
+      base.yMm +
+      direction.yMm *
+        scale,
+  }
+}
+
+function subtractScaledPosition(
+  base:
+    WorldPosition,
+
+  direction:
+    WorldPosition,
+
+  scale:
+    number,
+): WorldPosition {
+  return {
+    xMm:
+      base.xMm -
+      direction.xMm *
+        scale,
+
+    yMm:
+      base.yMm -
+      direction.yMm *
+        scale,
+  }
+}
+
+/*
+ * NATURAL CUBIC SPLINE THROUGH THE
+ * VIDEO-2 ARMHOLE REFERENCES
+ *
+ * Why this is used:
+ *
+ * The physical tutorial shapes one
+ * continuous armhole with a French
+ * curve. PAWTTERN's approved digital
+ * translation interpolates the two
+ * vertical pivots and Common Armpit
+ * between the shoulder endpoints.
+ *
+ * The lower Back/Front Arm Guide points
+ * remain construction references only;
+ * they are not forced onto the finished
+ * armhole edge.
+ *
+ * A natural cubic spline gives PAWTTERN
+ * a deterministic digital equivalent:
+ *
+ * - every Video-2 reference is hit
+ *   exactly;
+ * - first derivative is continuous;
+ * - second derivative is continuous;
+ * - both pivots and Common Armpit are
+ *   smooth glide-through points rather
+ *   than corners.
+ *
+ * Chord-length parameterization is used
+ * so uneven spacing between drafting
+ * references does not distort the curve.
+ */
+function createNaturalCubicSplineSegments(
+  points:
+    readonly WorldPosition[],
+): NaturalSplineSegment[] {
+  if (
+    points.length <
+    2
+  ) {
+    throw new Error(
+      'A natural cubic spline requires at least two points.',
+    )
+  }
+
+  const intervalCount =
+    points.length -
+    1
+
+  const h: number[] = []
+
+  for (
+    let index =
+      0;
+    index <
+      intervalCount;
+    index +=
+      1
+  ) {
+    const intervalLength =
+      distanceMm(
+        points[index],
+        points[index + 1],
+      )
+
+    if (
+      !Number.isFinite(
+        intervalLength,
+      ) ||
+      intervalLength <=
+        0
+    ) {
+      throw new Error(
+        'V2 armhole spline contains coincident or invalid reference points.',
+      )
+    }
+
+    h.push(
+      intervalLength,
+    )
+  }
+
+  /*
+   * Natural boundary conditions:
+   *
+   * second derivative at the two
+   * shoulder endpoints = 0.
+   *
+   * We solve the interior second
+   * derivatives with the Thomas
+   * tridiagonal algorithm.
+   */
+  const secondDerivatives:
+    WorldPosition[] =
+      points.map(
+        () => ({
+          xMm:
+            0,
+
+          yMm:
+            0,
+        }),
+      )
+
+  const interiorCount =
+    points.length -
+    2
+
+  if (
+    interiorCount >
+    0
+  ) {
+    const lower: number[] =
+      new Array(
+        interiorCount,
+      ).fill(0)
+
+    const diagonal: number[] =
+      new Array(
+        interiorCount,
+      ).fill(0)
+
+    const upper: number[] =
+      new Array(
+        interiorCount,
+      ).fill(0)
+
+    const rhs:
+      WorldPosition[] =
+        new Array(
+          interiorCount,
+        ).fill(null)
+          .map(
+            () => ({
+              xMm:
+                0,
+
+              yMm:
+                0,
+            }),
+          )
+
+    for (
+      let interiorIndex =
+        0;
+      interiorIndex <
+        interiorCount;
+      interiorIndex +=
+        1
+    ) {
+      const pointIndex =
+        interiorIndex +
+        1
+
+      const previousH =
+        h[
+          pointIndex -
+          1
+        ]
+
+      const nextH =
+        h[
+          pointIndex
+        ]
+
+      lower[
+        interiorIndex
+      ] =
+        previousH
+
+      diagonal[
+        interiorIndex
+      ] =
+        2 *
+        (
+          previousH +
+          nextH
+        )
+
+      upper[
+        interiorIndex
+      ] =
+        nextH
+
+      rhs[
+        interiorIndex
+      ] = {
+        xMm:
+          6 *
+          (
+            (
+              points[
+                pointIndex +
+                1
+              ].xMm -
+              points[
+                pointIndex
+              ].xMm
+            ) /
+              nextH -
+            (
+              points[
+                pointIndex
+              ].xMm -
+              points[
+                pointIndex -
+                1
+              ].xMm
+            ) /
+              previousH
+          ),
+
+        yMm:
+          6 *
+          (
+            (
+              points[
+                pointIndex +
+                1
+              ].yMm -
+              points[
+                pointIndex
+              ].yMm
+            ) /
+              nextH -
+            (
+              points[
+                pointIndex
+              ].yMm -
+              points[
+                pointIndex -
+                1
+              ].yMm
+            ) /
+              previousH
+          ),
+      }
+    }
+
+    /*
+     * Natural boundaries mean the
+     * outside second derivatives are
+     * zero, so the first and last
+     * off-diagonal terms need no
+     * additional RHS contribution.
+     */
+    for (
+      let index =
+        1;
+      index <
+        interiorCount;
+      index +=
+        1
+    ) {
+      const factor =
+        lower[index] /
+        diagonal[
+          index -
+          1
+        ]
+
+      diagonal[index] -=
+        factor *
+        upper[
+          index -
+          1
+        ]
+
+      rhs[index] = {
+        xMm:
+          rhs[index].xMm -
+          factor *
+            rhs[
+              index -
+              1
+            ].xMm,
+
+        yMm:
+          rhs[index].yMm -
+          factor *
+            rhs[
+              index -
+              1
+            ].yMm,
+      }
+    }
+
+    const solved:
+      WorldPosition[] =
+        new Array(
+          interiorCount,
+        ).fill(null)
+          .map(
+            () => ({
+              xMm:
+                0,
+
+              yMm:
+                0,
+            }),
+          )
+
+    const lastInteriorIndex =
+      interiorCount -
+      1
+
+    solved[
+      lastInteriorIndex
+    ] = {
+      xMm:
+        rhs[
+          lastInteriorIndex
+        ].xMm /
+        diagonal[
+          lastInteriorIndex
+        ],
+
+      yMm:
+        rhs[
+          lastInteriorIndex
+        ].yMm /
+        diagonal[
+          lastInteriorIndex
+        ],
+    }
+
+    for (
+      let index =
+        lastInteriorIndex -
+        1;
+      index >=
+        0;
+      index -=
+        1
+    ) {
+      solved[index] = {
+        xMm:
+          (
+            rhs[index].xMm -
+            upper[index] *
+              solved[
+                index +
+                1
+              ].xMm
+          ) /
+          diagonal[index],
+
+        yMm:
+          (
+            rhs[index].yMm -
+            upper[index] *
+              solved[
+                index +
+                1
+              ].yMm
+          ) /
+          diagonal[index],
+      }
+    }
+
+    for (
+      let interiorIndex =
+        0;
+      interiorIndex <
+        interiorCount;
+      interiorIndex +=
+        1
+    ) {
+      secondDerivatives[
+        interiorIndex +
+        1
+      ] =
+        solved[
+          interiorIndex
+        ]
+    }
+  }
+
+  const segments:
+    NaturalSplineSegment[] =
+      []
+
+  for (
+    let index =
+      0;
+    index <
+      intervalCount;
+    index +=
+      1
+  ) {
+    const start =
+      points[index]
+
+    const end =
+      points[
+        index +
+        1
+      ]
+
+    const intervalLength =
+      h[index]
+
+    const startSecond =
+      secondDerivatives[
+        index
+      ]
+
+    const endSecond =
+      secondDerivatives[
+        index +
+        1
+      ]
+
+    /*
+     * Natural-spline endpoint
+     * derivatives for this interval.
+     */
+    const startDerivative:
+      WorldPosition = {
+        xMm:
+          (
+            end.xMm -
+            start.xMm
+          ) /
+            intervalLength -
+          intervalLength *
+          (
+            2 *
+              startSecond.xMm +
+            endSecond.xMm
+          ) /
+            6,
+
+        yMm:
+          (
+            end.yMm -
+            start.yMm
+          ) /
+            intervalLength -
+          intervalLength *
+          (
+            2 *
+              startSecond.yMm +
+            endSecond.yMm
+          ) /
+            6,
+      }
+
+    const endDerivative:
+      WorldPosition = {
+        xMm:
+          (
+            end.xMm -
+            start.xMm
+          ) /
+            intervalLength +
+          intervalLength *
+          (
+            startSecond.xMm +
+            2 *
+              endSecond.xMm
+          ) /
+            6,
+
+        yMm:
+          (
+            end.yMm -
+            start.yMm
+          ) /
+            intervalLength +
+          intervalLength *
+          (
+            startSecond.yMm +
+            2 *
+              endSecond.yMm
+          ) /
+            6,
+      }
+
+    /*
+     * Exact cubic-spline interval
+     * -> cubic Bezier conversion.
+     *
+     * The spline derivative is with
+     * respect to chord-length parameter,
+     * therefore multiply by h/3.
+     */
+    const control1 =
+      addScaledPosition(
+        start,
+        startDerivative,
+        intervalLength /
+          3,
+      )
+
+    const control2 =
+      subtractScaledPosition(
+        end,
+        endDerivative,
+        intervalLength /
+          3,
+      )
+
+    segments.push({
+      start,
+
+      end,
+
+      control1,
+
+      control2,
+    })
+  }
+
+  return segments
+}
+
+function createArmholeSplineSegments(
+  formula:
+    ReferenceTankV2Formula,
+): NaturalSplineSegment[] {
+  return (
+    createNaturalCubicSplineSegments([
+      /*
+       * VIDEO-2 CONTINUOUS ARMHOLE PATH
+       *
+       * The finished armhole uses five
+       * authoritative on-curve points:
+       *
+       * Back Shoulder Outer
+       * -> Back Armhole Pivot
+       * -> Common Armpit
+       * -> Front Armhole Pivot
+       * -> Front Shoulder Outer
+       *
+       * Back/Front Arm Guide bottom
+       * intersections remain visible
+       * construction references only.
+       */
+      formula.backShoulderOuter,
+
+      formula.backArmholePivot,
+
+      formula.commonArmpit,
+
+      formula.frontArmholePivot,
+
+      formula.frontShoulderOuter,
+    ])
+  )
 }
 
 function validateNeckOpeningAllowance(
@@ -494,6 +1168,11 @@ export function createReferenceTankV2Construction(
       formula,
     )
 
+  const armholeSplineSegments =
+    createArmholeSplineSegments(
+      formula,
+    )
+
   let document =
     createEmptyDocument()
 
@@ -569,6 +1248,29 @@ export function createReferenceTankV2Construction(
         formula.armholeDepthMm,
     })
 
+  /*
+   * VIDEO 2 BACK ARMHOLE PIVOT
+   *
+   * Midpoint of the vertical Back Arm
+   * Guide after the guide is divided
+   * into 2 equal sections.
+   */
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .backArmholePivot,
+
+      name:
+        'V2 Back Armhole Pivot',
+
+      xMm:
+        formula.backArmholePivot.xMm,
+
+      yMm:
+        formula.backArmholePivot.yMm,
+    })
+
   document =
     addPoint(document, {
       id:
@@ -599,6 +1301,33 @@ export function createReferenceTankV2Construction(
 
       yMm:
         formula.armholeDepthMm,
+    })
+
+  /*
+   * VIDEO 2 FRONT ARMHOLE PIVOT
+   *
+   * Lower division point of the
+   * vertical Front Arm Guide after
+   * the guide is divided into 3.
+   *
+   * This is 2/3 downward from the top,
+   * or 1/3 upward from the armhole
+   * depth line.
+   */
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .frontArmholePivot,
+
+      name:
+        'V2 Front Armhole Pivot',
+
+      xMm:
+        formula.frontArmholePivot.xMm,
+
+      yMm:
+        formula.frontArmholePivot.yMm,
     })
 
   document =
@@ -788,6 +1517,193 @@ export function createReferenceTankV2Construction(
       control2:
         controls.frontControl2,
     })
+
+  /*
+   * FIXED VIDEO-2 ARMHOLE SPLINE
+   *
+   * Four cubic segments form one smooth
+   * logical French-curve sweep through
+   * five authoritative Video-2 points.
+   *
+   * The Back/Front Arm Guide bottom
+   * points remain construction guides
+   * only and do not constrain the
+   * finished armhole edge.
+   */
+  const [
+    backShoulderToPivot,
+    backPivotToCommon,
+    frontCommonToPivot,
+    frontPivotToShoulder,
+  ] =
+    armholeSplineSegments
+
+  document =
+    addCurve(document, {
+      id:
+        REFERENCE_TANK_V2_CURVE_IDS
+          .backArmholeShoulderToPivot,
+
+      name:
+        'V2 Back Armhole Shoulder to Pivot',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .backShoulderOuter,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .backArmholePivot,
+
+      control1:
+        backShoulderToPivot.control1,
+
+      control2:
+        backShoulderToPivot.control2,
+    })
+
+  document =
+    addCurve(document, {
+      id:
+        REFERENCE_TANK_V2_CURVE_IDS
+          .backArmholePivotToCommon,
+
+      name:
+        'V2 Back Armhole Pivot to Common',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .backArmholePivot,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .commonArmpit,
+
+      control1:
+        backPivotToCommon.control1,
+
+      control2:
+        backPivotToCommon.control2,
+    })
+
+  document =
+    addCurve(document, {
+      id:
+        REFERENCE_TANK_V2_CURVE_IDS
+          .frontArmholeCommonToPivot,
+
+      name:
+        'V2 Front Armhole Common to Pivot',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .commonArmpit,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .frontArmholePivot,
+
+      control1:
+        frontCommonToPivot.control1,
+
+      control2:
+        frontCommonToPivot.control2,
+    })
+
+  document =
+    addCurve(document, {
+      id:
+        REFERENCE_TANK_V2_CURVE_IDS
+          .frontArmholePivotToShoulder,
+
+      name:
+        'V2 Front Armhole Pivot to Shoulder',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .frontArmholePivot,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .frontShoulderOuter,
+
+      control1:
+        frontPivotToShoulder.control1,
+
+      control2:
+        frontPivotToShoulder.control2,
+    })
+
+  /*
+   * ARMHOLE QA METRICS
+   *
+   * The Master Block armhole is fixed
+   * formula-controlled geometry, but we
+   * still measure the actual generated
+   * Bézier curves for diagnostics and
+   * later physical-fit validation.
+   *
+   * Back = Back Shoulder Outer
+   *        -> Back Pivot
+   *        -> Common Armpit
+   *
+   * Front = Common Armpit
+   *         -> Front Pivot
+   *         -> Front Shoulder Outer
+   *
+   * One-side opening is the seam-line
+   * sum of Back + Front.
+   *
+   * No arbitrary minimum/percentage is
+   * enforced here.
+   */
+  const backArmholeLengthMm =
+    cubicBezierCurveLengthMm(
+      document.curves[
+        REFERENCE_TANK_V2_CURVE_IDS
+          .backArmholeShoulderToPivot
+      ],
+
+      document.points,
+
+      REFERENCE_TANK_V2_ARMHOLE_LENGTH_SEGMENTS,
+    ) +
+    cubicBezierCurveLengthMm(
+      document.curves[
+        REFERENCE_TANK_V2_CURVE_IDS
+          .backArmholePivotToCommon
+      ],
+
+      document.points,
+
+      REFERENCE_TANK_V2_ARMHOLE_LENGTH_SEGMENTS,
+    )
+
+  const frontArmholeLengthMm =
+    cubicBezierCurveLengthMm(
+      document.curves[
+        REFERENCE_TANK_V2_CURVE_IDS
+          .frontArmholeCommonToPivot
+      ],
+
+      document.points,
+
+      REFERENCE_TANK_V2_ARMHOLE_LENGTH_SEGMENTS,
+    ) +
+    cubicBezierCurveLengthMm(
+      document.curves[
+        REFERENCE_TANK_V2_CURVE_IDS
+          .frontArmholePivotToShoulder
+      ],
+
+      document.points,
+
+      REFERENCE_TANK_V2_ARMHOLE_LENGTH_SEGMENTS,
+    )
+
+  const oneSideArmholeOpeningMm =
+    backArmholeLengthMm +
+    frontArmholeLengthMm
 
   const backHalfNeckLengthMm =
     cubicBezierCurveLengthMm(
@@ -1012,6 +1928,12 @@ export function createReferenceTankV2Construction(
       frontHalfNeckLengthMm,
       finishedNeckOpeningMm,
       minimumNeckOpeningMm,
+    },
+
+    armhole: {
+      backArmholeLengthMm,
+      frontArmholeLengthMm,
+      oneSideArmholeOpeningMm,
     },
 
     document,

@@ -143,6 +143,17 @@ export interface ReferenceTankV2Formula {
   backShoulderOuter:
     PatternPointMm
 
+  /*
+   * VIDEO 2 BACK ARMHOLE
+   *
+   * Midpoint of the vertical
+   * Back Arm Guide.
+   *
+   * The back guide is divided into 2.
+   */
+  backArmholePivot:
+    PatternPointMm
+
   commonArmpit:
     PatternPointMm
 
@@ -153,6 +164,21 @@ export interface ReferenceTankV2Formula {
     PatternPointMm
 
   frontShoulderOuter:
+    PatternPointMm
+
+  /*
+   * VIDEO 2 FRONT ARMHOLE
+   *
+   * The Front Arm Guide is divided
+   * into 3 equal vertical sections.
+   *
+   * The armhole shaping reference is
+   * the lower division point:
+   * 2/3 downward from the top,
+   * or 1/3 upward from the
+   * armhole-depth line.
+   */
+  frontArmholePivot:
     PatternPointMm
 }
 
@@ -402,6 +428,38 @@ export function createReferenceTankV2Formula(
     }
 
   /*
+   * VIDEO 2 BACK ARMHOLE PIVOT
+   *
+   * The vertical Back Arm Guide runs
+   * from:
+   *
+   * Y = 0
+   *
+   * to:
+   *
+   * Y = B/5
+   *
+   * Video 2 divides this guide into 2.
+   *
+   * Therefore its midpoint is:
+   *
+   * Y = (B/5) / 2
+   *   = B/10
+   *
+   * X remains on the Back Arm Guide:
+   *
+   * X = 2W/5 + 5 mm
+   */
+  const backArmholePivot:
+    PatternPointMm = {
+      xMm:
+        backArmGuideXMm,
+
+      yMm:
+        armholeDepthMm / 2,
+    }
+
+  /*
    * Common lower armhole point.
    *
    * X = 3W/5
@@ -484,6 +542,46 @@ export function createReferenceTankV2Formula(
         shoulderDeltaMm,
     }
 
+  /*
+   * VIDEO 2 FRONT ARMHOLE PIVOT
+   *
+   * The Front Arm Guide runs vertically
+   * from Front Neck Center level down to
+   * the Armhole Depth line.
+   *
+   * Guide height:
+   *
+   * ArmholeDepth - FrontNeckCenterY
+   *
+   * which is equivalent to:
+   *
+   * B/2 - 10 mm
+   *
+   * Video 2 divides this guide into 3.
+   *
+   * The shaping reference used by the
+   * armhole is the LOWER division:
+   *
+   * 2/3 downward from the top
+   *
+   * which is equivalent to:
+   *
+   * 1/3 upward from the bottom.
+   */
+  const frontArmGuideHeightMm =
+    armholeDepthMm -
+    frontNeckCenterY
+
+  const frontArmholePivot:
+    PatternPointMm = {
+      xMm:
+        frontArmGuideXMm,
+
+      yMm:
+        armholeDepthMm -
+        frontArmGuideHeightMm / 3,
+    }
+
   return {
     ruleVersion:
       PAWTTERN_MASTER_V2_RULE_VERSION,
@@ -521,6 +619,8 @@ export function createReferenceTankV2Formula(
 
     backShoulderOuter,
 
+    backArmholePivot,
+
     commonArmpit,
 
     frontNeckCenter,
@@ -528,5 +628,7 @@ export function createReferenceTankV2Formula(
     frontSideNeck,
 
     frontShoulderOuter,
+
+    frontArmholePivot,
   }
 }

@@ -27,11 +27,90 @@ import {
 
 import {
   createReferenceTankV2Construction,
+  REFERENCE_TANK_V2_ARMHOLE_LENGTH_SEGMENTS,
   REFERENCE_TANK_V2_CURVE_IDS,
   REFERENCE_TANK_V2_LINE_IDS,
   REFERENCE_TANK_V2_NECKLINE_LENGTH_SEGMENTS,
   REFERENCE_TANK_V2_POINT_IDS,
 } from './referenceTankV2Construction'
+
+function expectSameTangentDirection(
+  first: {
+    xMm: number
+    yMm: number
+  },
+
+  second: {
+    xMm: number
+    yMm: number
+  },
+): void {
+  const firstLength =
+    Math.hypot(
+      first.xMm,
+      first.yMm,
+    )
+
+  const secondLength =
+    Math.hypot(
+      second.xMm,
+      second.yMm,
+    )
+
+  expect(
+    firstLength,
+  ).toBeGreaterThan(0)
+
+  expect(
+    secondLength,
+  ).toBeGreaterThan(0)
+
+  const normalizedCross =
+    (
+      first.xMm *
+        second.yMm -
+      first.yMm *
+        second.xMm
+    ) /
+    (
+      firstLength *
+      secondLength
+    )
+
+  const normalizedDot =
+    (
+      first.xMm *
+        second.xMm +
+      first.yMm *
+        second.yMm
+    ) /
+    (
+      firstLength *
+      secondLength
+    )
+
+  /*
+   * Adjacent cubic segments use their
+   * own local t parameter, so their
+   * derivative MAGNITUDES do not need
+   * to match.
+   *
+   * For a visually smooth join, their
+   * tangent DIRECTIONS must match.
+   */
+  expect(
+    normalizedCross,
+  ).toBeCloseTo(
+    0,
+    8,
+  )
+
+  expect(
+    normalizedDot,
+  ).toBeGreaterThan(
+    0.999999,
+  )
+}
 
 describe(
   'PAWTTERN Master Block V2 construction',
@@ -50,7 +129,7 @@ describe(
     }
 
     it(
-      'creates the V2 construction document with two neckline curves',
+      'creates the V2 construction document with two neckline curves and four smooth five-point armhole spline segments',
       () => {
         const result =
           createReferenceTankV2Construction(
@@ -62,7 +141,7 @@ describe(
           Object.keys(
             result.document.points,
           ),
-        ).toHaveLength(14)
+        ).toHaveLength(16)
 
         expect(
           Object.keys(
@@ -74,7 +153,7 @@ describe(
           Object.keys(
             result.document.curves,
           ),
-        ).toHaveLength(2)
+        ).toHaveLength(6)
       },
     )
 
@@ -183,6 +262,69 @@ describe(
           xMm: 190,
           yMm: 44,
         })
+      },
+    )
+
+    it(
+      'places the Video-2 back armhole midpoint pivot',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const pivot =
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .backArmholePivot
+          ]
+
+        expect(
+          pivot,
+        ).toBeDefined()
+
+        expect(
+          pivot,
+        ).toMatchObject({
+          xMm:
+            81,
+
+          yMm:
+            22,
+        })
+      },
+    )
+
+    it(
+      'places the Video-2 lower-third front armhole pivot',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const pivot =
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .frontArmholePivot
+          ]
+
+        expect(
+          pivot,
+        ).toBeDefined()
+
+        expect(
+          pivot.xMm,
+        ).toBe(157)
+
+        expect(
+          pivot.yMm,
+        ).toBeCloseTo(
+          10.6666666667,
+          8,
+        )
       },
     )
 
@@ -521,6 +663,344 @@ describe(
           REFERENCE_TANK_V2_POINT_IDS
             .frontSideNeck,
         )
+      },
+    )
+
+    it(
+      'connects the five-point armhole spline through the authoritative Video-2 references in order',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const backShoulderToPivot =
+          result.document.curves[
+            REFERENCE_TANK_V2_CURVE_IDS
+              .backArmholeShoulderToPivot
+          ]
+
+        const backPivotToCommon =
+          result.document.curves[
+            REFERENCE_TANK_V2_CURVE_IDS
+              .backArmholePivotToCommon
+          ]
+
+        const frontCommonToPivot =
+          result.document.curves[
+            REFERENCE_TANK_V2_CURVE_IDS
+              .frontArmholeCommonToPivot
+          ]
+
+        const frontPivotToShoulder =
+          result.document.curves[
+            REFERENCE_TANK_V2_CURVE_IDS
+              .frontArmholePivotToShoulder
+          ]
+
+        expect(
+          [
+            backShoulderToPivot.startPointId,
+            backShoulderToPivot.endPointId,
+            backPivotToCommon.endPointId,
+            frontCommonToPivot.endPointId,
+            frontPivotToShoulder.endPointId,
+          ],
+        ).toEqual([
+          REFERENCE_TANK_V2_POINT_IDS
+            .backShoulderOuter,
+
+          REFERENCE_TANK_V2_POINT_IDS
+            .backArmholePivot,
+
+          REFERENCE_TANK_V2_POINT_IDS
+            .commonArmpit,
+
+          REFERENCE_TANK_V2_POINT_IDS
+            .frontArmholePivot,
+
+          REFERENCE_TANK_V2_POINT_IDS
+            .frontShoulderOuter,
+        ])
+
+        expect(
+          backPivotToCommon.startPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .backArmholePivot,
+        )
+
+        expect(
+          frontCommonToPivot.startPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .commonArmpit,
+        )
+
+        expect(
+          frontPivotToShoulder.startPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .frontArmholePivot,
+        )
+      },
+    )
+
+    it(
+      'glides smoothly through the Back Armhole Pivot instead of turning sharply',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const incomingGeometry =
+          resolveCubicBezierGeometry(
+            result.document.curves[
+              REFERENCE_TANK_V2_CURVE_IDS
+                .backArmholeShoulderToPivot
+            ],
+            result.document.points,
+          )
+
+        const outgoingGeometry =
+          resolveCubicBezierGeometry(
+            result.document.curves[
+              REFERENCE_TANK_V2_CURVE_IDS
+                .backArmholePivotToCommon
+            ],
+            result.document.points,
+          )
+
+        expectSameTangentDirection(
+          cubicBezierDerivative(
+            incomingGeometry,
+            1,
+          ),
+
+          cubicBezierDerivative(
+            outgoingGeometry,
+            0,
+          ),
+        )
+      },
+    )
+
+    it(
+      'glides smoothly through Common Armpit without forcing the lower arm guides onto the finished edge',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const backGeometry =
+          resolveCubicBezierGeometry(
+            result.document.curves[
+              REFERENCE_TANK_V2_CURVE_IDS
+                .backArmholePivotToCommon
+            ],
+            result.document.points,
+          )
+
+        const frontGeometry =
+          resolveCubicBezierGeometry(
+            result.document.curves[
+              REFERENCE_TANK_V2_CURVE_IDS
+                .frontArmholeCommonToPivot
+            ],
+            result.document.points,
+          )
+
+        expectSameTangentDirection(
+          cubicBezierDerivative(
+            backGeometry,
+            1,
+          ),
+
+          cubicBezierDerivative(
+            frontGeometry,
+            0,
+          ),
+        )
+
+        expect(
+          Object.values(
+            result.document.curves,
+          ).some(
+            (curve) =>
+              curve.endPointId ===
+                REFERENCE_TANK_V2_POINT_IDS
+                  .backArmGuide ||
+              curve.startPointId ===
+                REFERENCE_TANK_V2_POINT_IDS
+                  .backArmGuide ||
+              curve.endPointId ===
+                REFERENCE_TANK_V2_POINT_IDS
+                  .frontArmGuide ||
+              curve.startPointId ===
+                REFERENCE_TANK_V2_POINT_IDS
+                  .frontArmGuide,
+          ),
+        ).toBe(false)
+      },
+    )
+
+    it(
+      'glides smoothly through the Front Armhole Pivot instead of turning sharply',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const incomingGeometry =
+          resolveCubicBezierGeometry(
+            result.document.curves[
+              REFERENCE_TANK_V2_CURVE_IDS
+                .frontArmholeCommonToPivot
+            ],
+            result.document.points,
+          )
+
+        const outgoingGeometry =
+          resolveCubicBezierGeometry(
+            result.document.curves[
+              REFERENCE_TANK_V2_CURVE_IDS
+                .frontArmholePivotToShoulder
+            ],
+            result.document.points,
+          )
+
+        expectSameTangentDirection(
+          cubicBezierDerivative(
+            incomingGeometry,
+            1,
+          ),
+
+          cubicBezierDerivative(
+            outgoingGeometry,
+            0,
+          ),
+        )
+      },
+    )
+
+    it(
+      'reports Back and Front armhole metrics from the actual generated Bezier arc lengths',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const backExpectedMm =
+          cubicBezierCurveLengthMm(
+            result.document.curves[
+              REFERENCE_TANK_V2_CURVE_IDS
+                .backArmholeShoulderToPivot
+            ],
+            result.document.points,
+            REFERENCE_TANK_V2_ARMHOLE_LENGTH_SEGMENTS,
+          ) +
+          cubicBezierCurveLengthMm(
+            result.document.curves[
+              REFERENCE_TANK_V2_CURVE_IDS
+                .backArmholePivotToCommon
+            ],
+            result.document.points,
+            REFERENCE_TANK_V2_ARMHOLE_LENGTH_SEGMENTS,
+          )
+
+        const frontExpectedMm =
+          cubicBezierCurveLengthMm(
+            result.document.curves[
+              REFERENCE_TANK_V2_CURVE_IDS
+                .frontArmholeCommonToPivot
+            ],
+            result.document.points,
+            REFERENCE_TANK_V2_ARMHOLE_LENGTH_SEGMENTS,
+          ) +
+          cubicBezierCurveLengthMm(
+            result.document.curves[
+              REFERENCE_TANK_V2_CURVE_IDS
+                .frontArmholePivotToShoulder
+            ],
+            result.document.points,
+            REFERENCE_TANK_V2_ARMHOLE_LENGTH_SEGMENTS,
+          )
+
+        expect(
+          result.armhole
+            .backArmholeLengthMm,
+        ).toBeCloseTo(
+          backExpectedMm,
+          8,
+        )
+
+        expect(
+          result.armhole
+            .frontArmholeLengthMm,
+        ).toBeCloseTo(
+          frontExpectedMm,
+          8,
+        )
+
+        expect(
+          result.armhole
+            .backArmholeLengthMm,
+        ).toBeGreaterThan(0)
+
+        expect(
+          result.armhole
+            .frontArmholeLengthMm,
+        ).toBeGreaterThan(0)
+      },
+    )
+
+    it(
+      'reports one-side armhole opening as Back plus Front with no fit threshold applied',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const expectedOneSideMm =
+          result.armhole
+            .backArmholeLengthMm +
+          result.armhole
+            .frontArmholeLengthMm
+
+        expect(
+          result.armhole
+            .oneSideArmholeOpeningMm,
+        ).toBeCloseTo(
+          expectedOneSideMm,
+          8,
+        )
+
+        /*
+         * This metric is diagnostic only.
+         *
+         * It deliberately reports the
+         * actual generated seam-line arc
+         * and does not assert a universal
+         * anatomical minimum, percentage,
+         * or safety threshold.
+         */
+        expect(
+          Number.isFinite(
+            result.armhole
+              .oneSideArmholeOpeningMm,
+          ),
+        ).toBe(true)
       },
     )
 

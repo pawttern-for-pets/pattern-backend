@@ -117,6 +117,15 @@ interface CadCanvasProps {
 
   onUndo: () => void
   onRedo: () => void
+
+  /*
+   * Pattern-specific code can mark
+   * generated curves as read-only
+   * without teaching the generic CAD
+   * canvas anything about PAWTTERN V2.
+   */
+  readOnlyCurveIds?:
+    readonly string[]
 }
 
 interface CanvasSize {
@@ -189,6 +198,7 @@ export function CadCanvas({
   canRedo,
   onUndo,
   onRedo,
+  readOnlyCurveIds = [],
 }: CadCanvasProps) {
   const svgRef =
     useRef<SVGSVGElement | null>(
@@ -412,6 +422,24 @@ export function CadCanvas({
           selection.id
         ] ?? null
       : null
+
+  const isCurveReadOnly = (
+    curveId:
+      string,
+  ): boolean => {
+    return (
+      readOnlyCurveIds.includes(
+        curveId,
+      )
+    )
+  }
+
+  const selectedCurveIsReadOnly =
+    selection?.kind ===
+      'curve' &&
+    isCurveReadOnly(
+      selection.id,
+    )
 
   const selectedCurveStartPoint =
     selectedCurve
@@ -642,6 +670,7 @@ export function CadCanvas({
     document,
     measureStartPointId,
     measureEndPointId,
+    readOnlyCurveIds,
   ])
 
   /*
@@ -929,6 +958,7 @@ export function CadCanvas({
     if (
       selection?.kind !==
         'curve' ||
+      selectedCurveIsReadOnly ||
       !selectedCurve ||
       !selectedControl1Screen ||
       !selectedControl2Screen
@@ -1440,6 +1470,14 @@ export function CadCanvas({
     handle:
       CurveControlHandle,
   ) => {
+    if (
+      isCurveReadOnly(
+        curveId,
+      )
+    ) {
+      return
+    }
+
     event.preventDefault()
 
     curveHandleDragRef.current = {
@@ -2333,6 +2371,9 @@ export function CadCanvas({
     if (
       selection?.kind !==
         'curve' ||
+      isCurveReadOnly(
+        selection.id,
+      ) ||
       isDraggingGeometry
     ) {
       return
@@ -2464,10 +2505,18 @@ export function CadCanvas({
     }
   }
 
+  const selectionIsReadOnlyCurve =
+    selection?.kind ===
+      'curve' &&
+    isCurveReadOnly(
+      selection.id,
+    )
+
   const handleDeleteSelection =
     () => {
       if (
         selection === null ||
+        selectionIsReadOnlyCurve ||
         isDraggingGeometry
       ) {
         return
@@ -2656,7 +2705,14 @@ export function CadCanvas({
         'delete'
       ) {
         if (
-          selection === null
+          selection === null ||
+          (
+            selection.kind ===
+              'curve' &&
+            isCurveReadOnly(
+              selection.id,
+            )
+          )
         ) {
           return
         }
@@ -3290,6 +3346,7 @@ export function CadCanvas({
         {/* SELECTED CURVE CONTROL HANDLES */}
 
         {selectedCurve &&
+          !selectedCurveIsReadOnly &&
           selectedCurveStartScreen &&
           selectedCurveEndScreen &&
           selectedControl1Screen &&
@@ -3807,6 +3864,28 @@ export function CadCanvas({
               </strong>
             </div>
 
+            {selectedCurveIsReadOnly ? (
+              <div
+                style={{
+                  padding:
+                    '9px 10px',
+                  background:
+                    '#f5f5f5',
+                  border:
+                    '1px solid #dddddd',
+                  borderRadius:
+                    '3px',
+                  color:
+                    '#555555',
+                  lineHeight:
+                    1.4,
+                }}
+              >
+                Generated curve —
+                editing locked.
+              </div>
+            ) : (
+              <>
             <div
               style={{
                 marginBottom:
@@ -4020,7 +4099,11 @@ export function CadCanvas({
               </div>
             </div>
 
-            {curveControlError && (
+              </>
+            )}
+
+            {!selectedCurveIsReadOnly &&
+              curveControlError && (
               <div
                 style={{
                   marginTop:
@@ -4035,19 +4118,21 @@ export function CadCanvas({
               </div>
             )}
 
-            <div
-              style={{
-                marginTop:
-                  '9px',
-                color:
-                  '#666666',
-                lineHeight: 1.4,
-              }}
-            >
-              Mouse dragging uses
-              snap. Exact numeric
-              input does not snap.
-            </div>
+            {!selectedCurveIsReadOnly && (
+              <div
+                style={{
+                  marginTop:
+                    '9px',
+                  color:
+                    '#666666',
+                  lineHeight: 1.4,
+                }}
+              >
+                Mouse dragging uses
+                snap. Exact numeric
+                input does not snap.
+              </div>
+            )}
           </div>
         )}
 
@@ -4476,6 +4561,7 @@ export function CadCanvas({
             type="button"
             disabled={
               selection === null ||
+              selectionIsReadOnlyCurve ||
               isDraggingGeometry
             }
             onClick={

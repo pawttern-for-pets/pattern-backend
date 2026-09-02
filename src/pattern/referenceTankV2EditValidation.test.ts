@@ -962,6 +962,482 @@ describe(
     )
 
     it(
+      'rejects manually moving the generated Back Armhole Pivot',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const pointId =
+          REFERENCE_TANK_V2_POINT_IDS
+            .backArmholePivot
+
+        const point =
+          project.document.points[
+            pointId
+          ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          points: {
+            ...project.document
+              .points,
+
+            [pointId]: {
+              ...point,
+
+              xMm:
+                point.xMm +
+                5,
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /cannot be moved manually/i,
+        )
+      },
+    )
+
+    it(
+      'rejects manually moving the generated Front Armhole Pivot',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const pointId =
+          REFERENCE_TANK_V2_POINT_IDS
+            .frontArmholePivot
+
+        const point =
+          project.document.points[
+            pointId
+          ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          points: {
+            ...project.document
+              .points,
+
+            [pointId]: {
+              ...point,
+
+              yMm:
+                point.yMm +
+                5,
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /cannot be moved manually/i,
+        )
+      },
+    )
+
+    it(
+      'rejects manually moving the generated Common Armpit',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const pointId =
+          REFERENCE_TANK_V2_POINT_IDS
+            .commonArmpit
+
+        const point =
+          project.document.points[
+            pointId
+          ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          points: {
+            ...project.document
+              .points,
+
+            [pointId]: {
+              ...point,
+
+              xMm:
+                point.xMm +
+                5,
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /cannot be moved manually/i,
+        )
+      },
+    )
+
+    it(
+      'rejects manually moving either generated Arm Guide construction point',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        for (
+          const pointId
+          of [
+            REFERENCE_TANK_V2_POINT_IDS
+              .backArmGuide,
+
+            REFERENCE_TANK_V2_POINT_IDS
+              .frontArmGuide,
+          ]
+        ) {
+          const point =
+            project.document.points[
+              pointId
+            ]
+
+          const candidateDocument = {
+            ...project.document,
+
+            points: {
+              ...project.document
+                .points,
+
+              [pointId]: {
+                ...point,
+
+                yMm:
+                  point.yMm +
+                  5,
+              },
+            },
+          }
+
+          const result =
+            validateReferenceTankV2DocumentEdit(
+              project,
+              candidateDocument,
+            )
+
+          expect(
+            result.isValid,
+          ).toBe(false)
+
+          expect(
+            result.message,
+          ).toMatch(
+            /cannot be moved manually/i,
+          )
+        }
+      },
+    )
+
+    it(
+      'rejects deleting either generated Arm Guide construction point',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        for (
+          const pointId
+          of [
+            REFERENCE_TANK_V2_POINT_IDS
+              .backArmGuide,
+
+            REFERENCE_TANK_V2_POINT_IDS
+              .frontArmGuide,
+          ]
+        ) {
+          const remainingPoints = {
+            ...project.document.points,
+          }
+
+          delete remainingPoints[
+            pointId
+          ]
+
+          const candidateDocument = {
+            ...project.document,
+
+            points:
+              remainingPoints,
+          }
+
+          const result =
+            validateReferenceTankV2DocumentEdit(
+              project,
+              candidateDocument,
+            )
+
+          expect(
+            result.isValid,
+          ).toBe(false)
+
+          expect(
+            result.message,
+          ).toMatch(
+            /cannot be deleted/i,
+          )
+        }
+      },
+    )
+
+    it(
+      'rejects deleting a generated armhole spline segment',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const curveId =
+          REFERENCE_TANK_V2_CURVE_IDS
+            .backArmholePivotToCommon
+
+        const remainingCurves = {
+          ...project.document.curves,
+        }
+
+        delete remainingCurves[
+          curveId
+        ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          curves:
+            remainingCurves,
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /armhole curve.*cannot be deleted/i,
+        )
+      },
+    )
+
+    it(
+      'rejects moving Ctrl 1 on a generated armhole spline segment',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const curveId =
+          REFERENCE_TANK_V2_CURVE_IDS
+            .backArmholePivotToCommon
+
+        const curve =
+          project.document.curves[
+            curveId
+          ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          curves: {
+            ...project.document
+              .curves,
+
+            [curveId]: {
+              ...curve,
+
+              control1: {
+                ...curve.control1,
+
+                xMm:
+                  curve.control1.xMm +
+                  1,
+              },
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /armhole curve.*cannot be edited manually/i,
+        )
+      },
+    )
+
+    it(
+      'rejects moving Ctrl 2 on a generated armhole spline segment',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const curveId =
+          REFERENCE_TANK_V2_CURVE_IDS
+            .frontArmholeCommonToPivot
+
+        const curve =
+          project.document.curves[
+            curveId
+          ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          curves: {
+            ...project.document
+              .curves,
+
+            [curveId]: {
+              ...curve,
+
+              control2: {
+                ...curve.control2,
+
+                yMm:
+                  curve.control2.yMm +
+                  1,
+              },
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /armhole curve.*cannot be edited manually/i,
+        )
+      },
+    )
+
+    it(
+      'rejects reassigning a generated armhole spline endpoint',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const curveId =
+          REFERENCE_TANK_V2_CURVE_IDS
+            .frontArmholePivotToShoulder
+
+        const curve =
+          project.document.curves[
+            curveId
+          ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          curves: {
+            ...project.document
+              .curves,
+
+            [curveId]: {
+              ...curve,
+
+              endPointId:
+                REFERENCE_TANK_V2_POINT_IDS
+                  .backBottom,
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /armhole curve.*cannot be edited manually/i,
+        )
+      },
+    )
+
+    it(
       'allows editing unrelated non-protected geometry',
       () => {
         const project =

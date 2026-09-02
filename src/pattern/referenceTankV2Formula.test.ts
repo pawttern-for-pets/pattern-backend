@@ -149,6 +149,91 @@ describe(
     )
 
     it(
+      'calculates the Video-2 back armhole midpoint pivot',
+      () => {
+        const result =
+          createReferenceTankV2Formula(
+            measurements,
+            options,
+          )
+
+        /*
+         * W = 190 mm
+         *
+         * Back guide X:
+         *
+         * 2W/5 + 5 mm
+         * = 2(38) + 5
+         * = 81 mm
+         *
+         * Back guide runs vertically
+         * from Y = 0 to Y = B/5 = 44.
+         *
+         * Video 2 divides it into 2:
+         *
+         * Y = 44 / 2
+         *   = 22 mm
+         */
+        expect(
+          result.backArmholePivot,
+        ).toEqual({
+          xMm:
+            81,
+
+          yMm:
+            22,
+        })
+      },
+    )
+
+    it(
+      'calculates the Video-2 lower-third front armhole pivot',
+      () => {
+        const result =
+          createReferenceTankV2Formula(
+            measurements,
+            options,
+          )
+
+        /*
+         * Front guide X:
+         *
+         * 4W/5 + 5 mm
+         * = 4(38) + 5
+         * = 157 mm
+         *
+         * Front guide top:
+         * Front Neck Center Y = -56 mm
+         *
+         * Front guide bottom:
+         * Armhole Depth Y = 44 mm
+         *
+         * Guide height:
+         * 44 - (-56)
+         * = 100 mm
+         *
+         * Video 2 divides it into 3.
+         *
+         * Armhole uses the lower
+         * division point:
+         *
+         * 44 - 100/3
+         * = 10.666666... mm
+         */
+        expect(
+          result.frontArmholePivot.xMm,
+        ).toBe(157)
+
+        expect(
+          result.frontArmholePivot.yMm,
+        ).toBeCloseTo(
+          10.6666666667,
+          8,
+        )
+      },
+    )
+
+    it(
       'constructs the default back side-neck from N/4 and N/8',
       () => {
         const result =

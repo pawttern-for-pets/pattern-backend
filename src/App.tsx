@@ -57,6 +57,10 @@ import {
 } from './pattern/referenceTankV2Formula'
 
 import {
+  REFERENCE_TANK_V2_CURVE_IDS,
+} from './pattern/referenceTankV2Construction'
+
+import {
   validateReferenceTankV2DocumentEdit,
 } from './pattern/referenceTankV2EditValidation'
 
@@ -70,6 +74,24 @@ import {
 
 const DEFAULT_PATTERN_FILE_NAME =
   'untitled-pawttern.json'
+
+const EMPTY_READ_ONLY_CURVE_IDS:
+  readonly string[] = []
+
+const V2_MASTER_BLOCK_READ_ONLY_CURVE_IDS:
+  readonly string[] = [
+    REFERENCE_TANK_V2_CURVE_IDS
+      .backArmholeShoulderToPivot,
+
+    REFERENCE_TANK_V2_CURVE_IDS
+      .backArmholePivotToCommon,
+
+    REFERENCE_TANK_V2_CURVE_IDS
+      .frontArmholeCommonToPivot,
+
+    REFERENCE_TANK_V2_CURVE_IDS
+      .frontArmholePivotToShoulder,
+  ]
 
 interface ProjectState {
   patternHistory:
@@ -183,6 +205,25 @@ function App() {
 
   const patternDocument =
     patternProject.document
+
+  /*
+   * Pattern layer decides which generated
+   * curves the generic CAD canvas must
+   * treat as read-only.
+   *
+   * The approved Video-2 Master Block
+   * armhole is formula-controlled.
+   *
+   * Manual/blank CAD documents remain
+   * fully editable.
+   */
+  const readOnlyCurveIds =
+    patternProject.draftingRuleVersion ===
+      PAWTTERN_MASTER_V2_RULE_VERSION &&
+    patternProject.measurements !==
+      null
+      ? V2_MASTER_BLOCK_READ_ONLY_CURVE_IDS
+      : EMPTY_READ_ONLY_CURVE_IDS
 
   const hasUnsavedChanges =
     useMemo(
@@ -925,6 +966,9 @@ function App() {
           }
           onRedo={
             handleRedo
+          }
+          readOnlyCurveIds={
+            readOnlyCurveIds
           }
         />
       </main>

@@ -33,7 +33,7 @@ const POINT_POSITION_TOLERANCE_MM =
 const NECKLINE_SHAPE_TOLERANCE_MM =
   0.001
 
-const PROTECTED_NECK_POINT_IDS = [
+const PROTECTED_GENERATED_POINT_IDS = [
   REFERENCE_TANK_V2_POINT_IDS.backNeckCenter,
   REFERENCE_TANK_V2_POINT_IDS.backNeckWidthBase,
   REFERENCE_TANK_V2_POINT_IDS.backSideNeck,
@@ -42,6 +42,28 @@ const PROTECTED_NECK_POINT_IDS = [
   REFERENCE_TANK_V2_POINT_IDS.frontNeckWidthBase,
   REFERENCE_TANK_V2_POINT_IDS.frontSideNeck,
   REFERENCE_TANK_V2_POINT_IDS.frontShoulderOuter,
+
+  REFERENCE_TANK_V2_POINT_IDS.backArmholeLevel,
+  REFERENCE_TANK_V2_POINT_IDS.backArmGuide,
+  REFERENCE_TANK_V2_POINT_IDS.backArmholePivot,
+  REFERENCE_TANK_V2_POINT_IDS.commonArmpit,
+  REFERENCE_TANK_V2_POINT_IDS.frontArmholePivot,
+  REFERENCE_TANK_V2_POINT_IDS.frontArmGuide,
+  REFERENCE_TANK_V2_POINT_IDS.frontArmholeLevel,
+] as const
+
+const PROTECTED_ARMHOLE_CURVE_IDS = [
+  REFERENCE_TANK_V2_CURVE_IDS
+    .backArmholeShoulderToPivot,
+
+  REFERENCE_TANK_V2_CURVE_IDS
+    .backArmholePivotToCommon,
+
+  REFERENCE_TANK_V2_CURVE_IDS
+    .frontArmholeCommonToPivot,
+
+  REFERENCE_TANK_V2_CURVE_IDS
+    .frontArmholePivotToShoulder,
 ] as const
 
 export interface ReferenceTankV2EditValidationResult {
@@ -161,7 +183,7 @@ function isBetweenInclusive(
   )
 }
 
-function validateProtectedNeckPoints(
+function validateProtectedGeneratedPoints(
   currentDocument:
     PatternDocument,
 
@@ -170,7 +192,7 @@ function validateProtectedNeckPoints(
 ): string | null {
   for (
     const pointId
-    of PROTECTED_NECK_POINT_IDS
+    of PROTECTED_GENERATED_POINT_IDS
   ) {
     const currentPoint =
       currentDocument.points[
@@ -206,6 +228,76 @@ function validateProtectedNeckPoints(
       return (
         `Generated pattern point ${pointId} cannot be moved manually. ` +
         'Adjust the parametric pattern settings instead.'
+      )
+    }
+  }
+
+  return null
+}
+
+function validateProtectedArmholeCurves(
+  currentDocument:
+    PatternDocument,
+
+  candidateDocument:
+    PatternDocument,
+): string | null {
+  for (
+    const curveId
+    of PROTECTED_ARMHOLE_CURVE_IDS
+  ) {
+    const currentCurve =
+      currentDocument.curves[
+        curveId
+      ]
+
+    if (!currentCurve) {
+      continue
+    }
+
+    const candidateCurve =
+      candidateDocument.curves[
+        curveId
+      ]
+
+    if (!candidateCurve) {
+      return (
+        `Generated armhole curve ${curveId} cannot be deleted. ` +
+        'Regenerate the parametric Master Block instead.'
+      )
+    }
+
+    const endpointsChanged =
+      candidateCurve.startPointId !==
+        currentCurve.startPointId ||
+      candidateCurve.endPointId !==
+        currentCurve.endPointId
+
+    const controlsChanged =
+      !isSameCoordinate(
+        candidateCurve.control1.xMm,
+        currentCurve.control1.xMm,
+      ) ||
+      !isSameCoordinate(
+        candidateCurve.control1.yMm,
+        currentCurve.control1.yMm,
+      ) ||
+      !isSameCoordinate(
+        candidateCurve.control2.xMm,
+        currentCurve.control2.xMm,
+      ) ||
+      !isSameCoordinate(
+        candidateCurve.control2.yMm,
+        currentCurve.control2.yMm,
+      )
+
+    if (
+      endpointsChanged ||
+      controlsChanged
+    ) {
+      return (
+        `Generated armhole curve ${curveId} cannot be edited manually. ` +
+        'The V2 Master Block armhole is controlled by the Video-2 drafting formula.'
       )
     }
   }
@@ -615,7 +707,7 @@ export function validateReferenceTankV2DocumentEdit(
     project.neckOpeningAllowanceMm
 
   const protectedPointError =
-    validateProtectedNeckPoints(
+    validateProtectedGeneratedPoints(
       project.document,
       candidateDocument,
     )
@@ -630,6 +722,30 @@ export function validateReferenceTankV2DocumentEdit(
 
       message:
         protectedPointError,
+
+      finishedNeckOpeningMm:
+        null,
+
+      minimumNeckOpeningMm,
+    }
+  }
+
+  const protectedArmholeCurveError =
+    validateProtectedArmholeCurves(
+      project.document,
+      candidateDocument,
+    )
+
+  if (
+    protectedArmholeCurveError !==
+    null
+  ) {
+    return {
+      isValid:
+        false,
+
+      message:
+        protectedArmholeCurveError,
 
       finishedNeckOpeningMm:
         null,
