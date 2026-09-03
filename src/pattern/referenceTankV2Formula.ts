@@ -22,6 +22,22 @@ import type {
 export const PAWTTERN_MASTER_V2_RULE_VERSION =
   'PAWTTERN_MASTER_V2' as const
 
+/*
+ * VIDEO 2 LOWER-BODY SHAPING
+ *
+ * The tutorial marks 1 cm on each side
+ * of the Common Armpit vertical axis.
+ *
+ * Total shaping width = 2 cm.
+ *
+ * This is a source-faithful internal
+ * drafting constant for V2. It is not
+ * a user-adjustable fit parameter.
+ */
+export const
+  REFERENCE_TANK_V2_SIDE_SHAPING_HALF_WIDTH_MM =
+    10
+
 export interface ReferenceTankV2FormulaOptions {
   /*
    * Explicit half-body/chest allowance.
@@ -132,6 +148,31 @@ export interface ReferenceTankV2Formula {
     number
 
   /*
+   * VIDEO 2 LOWER-BODY SCAFFOLD
+   *
+   * These are mathematically certain
+   * construction references recovered
+   * from the tutorial beginning at 6:33.
+   *
+   * No lower-body finished curves are
+   * defined here yet.
+   */
+  backLengthTwoFifthsMm:
+    number
+
+  backLengthThreeFifthsMm:
+    number
+
+  backLengthFourFifthsMm:
+    number
+
+  sideShapingBaseYMm:
+    number
+
+  sideShapingHalfWidthMm:
+    number
+
+  /*
    * Important construction points.
    */
   backNeckCenter:
@@ -155,6 +196,54 @@ export interface ReferenceTankV2Formula {
     PatternPointMm
 
   commonArmpit:
+    PatternPointMm
+
+  /*
+   * VIDEO 2 LOWER-BODY SCAFFOLD
+   *
+   * The Common Armpit X coordinate is
+   * extended downward as the center axis
+   * for the 2 cm side-shaping separation.
+   */
+  sideShapingBackPoint:
+    PatternPointMm
+
+  sideShapingBellyPoint:
+    PatternPointMm
+
+  /*
+   * Back hem division references.
+   *
+   * The 2/3 point is construction-only.
+   * The finished lower-back outline is
+   * solved in a later milestone.
+   */
+  backHemOneThirdPoint:
+    PatternPointMm
+
+  backHemTwoThirdsPoint:
+    PatternPointMm
+
+  /*
+   * Belly/right-edge reference points.
+   *
+   * Female source endpoint = 3B/5.
+   *
+   * Male default source endpoint = B/2.
+   *
+   * Male upper adjustment reference =
+   * 2B/5.
+   *
+   * These are geometry references only;
+   * no sex selector/UI is introduced yet.
+   */
+  femaleBellyEndpoint:
+    PatternPointMm
+
+  maleBellyDefaultEndpoint:
+    PatternPointMm
+
+  maleBellyUpperReference:
     PatternPointMm
 
   frontNeckCenter:
@@ -358,6 +447,142 @@ export function createReferenceTankV2Formula(
   const frontArmGuideXMm =
     4 * fifthWidthMm +
     5
+
+  /*
+   * VIDEO 2 LOWER-BODY SCAFFOLD
+   *
+   * The tutorial marks horizontal
+   * Back-Length levels at:
+   *
+   * 2B/5
+   * 3B/5
+   * 4B/5
+   */
+  const backLengthTwoFifthsMm =
+    2 * backLengthMm / 5
+
+  const backLengthThreeFifthsMm =
+    3 * backLengthMm / 5
+
+  const backLengthFourFifthsMm =
+    4 * backLengthMm / 5
+
+  /*
+   * The distance between 3B/5 and 4B/5
+   * is divided into two.
+   *
+   * midpoint =
+   * (3B/5 + 4B/5) / 2
+   * = 7B/10
+   */
+  const sideShapingBaseYMm =
+    7 * backLengthMm / 10
+
+  const sideShapingHalfWidthMm =
+    REFERENCE_TANK_V2_SIDE_SHAPING_HALF_WIDTH_MM
+
+  /*
+   * The shaping points sit 1 cm to each
+   * side of the Common Armpit vertical
+   * axis X = 3W/5.
+   */
+  const sideShapingBackPoint:
+    PatternPointMm = {
+      xMm:
+        commonArmpitXMm -
+        sideShapingHalfWidthMm,
+
+      yMm:
+        sideShapingBaseYMm,
+    }
+
+  const sideShapingBellyPoint:
+    PatternPointMm = {
+      xMm:
+        commonArmpitXMm +
+        sideShapingHalfWidthMm,
+
+      yMm:
+        sideShapingBaseYMm,
+    }
+
+  /*
+   * Defensive geometry check.
+   *
+   * The fixed +/- 1 cm source rule must
+   * remain inside the half-body block.
+   * If an extremely narrow/impossible
+   * input would push either point outside,
+   * fail explicitly rather than silently
+   * producing crossed geometry.
+   */
+  if (
+    sideShapingBackPoint.xMm <= 0 ||
+    sideShapingBellyPoint.xMm >=
+      halfBodyWidthMm
+  ) {
+    throw new Error(
+      'Video-2 side-shaping points do not fit inside the generated half-body width. Increase the body width or review the input measurements.',
+    )
+  }
+
+  /*
+   * BACK HEM REFERENCES
+   *
+   * Video 2 divides the Back-side span
+   * from X = 0 to the Common Armpit axis
+   * into thirds at full Back Length B.
+   */
+  const backHemOneThirdPoint:
+    PatternPointMm = {
+      xMm:
+        commonArmpitXMm / 3,
+
+      yMm:
+        backLengthMm,
+    }
+
+  const backHemTwoThirdsPoint:
+    PatternPointMm = {
+      xMm:
+        2 * commonArmpitXMm / 3,
+
+      yMm:
+        backLengthMm,
+    }
+
+  /*
+   * BELLY / RIGHT-EDGE REFERENCES
+   *
+   * These remain separate source points
+   * for later lower-body curve work.
+   */
+  const femaleBellyEndpoint:
+    PatternPointMm = {
+      xMm:
+        halfBodyWidthMm,
+
+      yMm:
+        backLengthThreeFifthsMm,
+    }
+
+  const maleBellyDefaultEndpoint:
+    PatternPointMm = {
+      xMm:
+        halfBodyWidthMm,
+
+      yMm:
+        backLengthMm / 2,
+    }
+
+  const maleBellyUpperReference:
+    PatternPointMm = {
+      xMm:
+        halfBodyWidthMm,
+
+      yMm:
+        backLengthTwoFifthsMm,
+    }
 
   /*
    * BACK NECK
@@ -613,6 +838,16 @@ export function createReferenceTankV2Formula(
 
     frontArmGuideXMm,
 
+    backLengthTwoFifthsMm,
+
+    backLengthThreeFifthsMm,
+
+    backLengthFourFifthsMm,
+
+    sideShapingBaseYMm,
+
+    sideShapingHalfWidthMm,
+
     backNeckCenter,
 
     backSideNeck,
@@ -622,6 +857,20 @@ export function createReferenceTankV2Formula(
     backArmholePivot,
 
     commonArmpit,
+
+    sideShapingBackPoint,
+
+    sideShapingBellyPoint,
+
+    backHemOneThirdPoint,
+
+    backHemTwoThirdsPoint,
+
+    femaleBellyEndpoint,
+
+    maleBellyDefaultEndpoint,
+
+    maleBellyUpperReference,
 
     frontNeckCenter,
 

@@ -103,6 +103,36 @@ export const REFERENCE_TANK_V2_POINT_IDS = {
 
   backBottom:
     'V2_BACK_BOTTOM',
+
+  sideAxisTwoFifths:
+    'V2_SIDE_AXIS_TWO_FIFTHS',
+
+  sideAxisThreeFifths:
+    'V2_SIDE_AXIS_THREE_FIFTHS',
+
+  sideAxisFourFifths:
+    'V2_SIDE_AXIS_FOUR_FIFTHS',
+
+  sideShapingBack:
+    'V2_SIDE_SHAPING_BACK',
+
+  sideShapingBelly:
+    'V2_SIDE_SHAPING_BELLY',
+
+  backHemOneThird:
+    'V2_BACK_HEM_ONE_THIRD',
+
+  backHemTwoThirds:
+    'V2_BACK_HEM_TWO_THIRDS',
+
+  femaleBellyEndpoint:
+    'V2_FEMALE_BELLY_ENDPOINT',
+
+  maleBellyDefaultEndpoint:
+    'V2_MALE_BELLY_DEFAULT_ENDPOINT',
+
+  maleBellyUpperReference:
+    'V2_MALE_BELLY_UPPER_REFERENCE',
 } as const
 
 export const REFERENCE_TANK_V2_LINE_IDS = {
@@ -132,6 +162,12 @@ export const REFERENCE_TANK_V2_LINE_IDS = {
 
   frontShoulder:
     'V2_FRONT_SHOULDER',
+
+  lowerBodySideAxis:
+    'V2_LOWER_BODY_SIDE_AXIS',
+
+  sideShapingWidth:
+    'V2_SIDE_SHAPING_WIDTH',
 } as const
 
 export const REFERENCE_TANK_V2_CURVE_IDS = {
@@ -1213,6 +1249,175 @@ export function createReferenceTankV2Construction(
     })
 
   /*
+   * VIDEO-2 LOWER-BODY SCAFFOLD
+   *
+   * Keep 2B/5, 3B/5 and 4B/5 as
+   * reference points on the Common
+   * Armpit vertical axis instead of
+   * drawing three full-width lines.
+   */
+
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .sideAxisTwoFifths,
+
+      name:
+        'V2 Side Axis 2/5 B',
+
+      xMm:
+        formula.commonArmpitXMm,
+
+      yMm:
+        formula.backLengthTwoFifthsMm,
+    })
+
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .sideAxisThreeFifths,
+
+      name:
+        'V2 Side Axis 3/5 B',
+
+      xMm:
+        formula.commonArmpitXMm,
+
+      yMm:
+        formula.backLengthThreeFifthsMm,
+    })
+
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .sideAxisFourFifths,
+
+      name:
+        'V2 Side Axis 4/5 B',
+
+      xMm:
+        formula.commonArmpitXMm,
+
+      yMm:
+        formula.backLengthFourFifthsMm,
+    })
+
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .sideShapingBack,
+
+      name:
+        'V2 Side Shaping Back',
+
+      xMm:
+        formula.sideShapingBackPoint.xMm,
+
+      yMm:
+        formula.sideShapingBackPoint.yMm,
+    })
+
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .sideShapingBelly,
+
+      name:
+        'V2 Side Shaping Belly',
+
+      xMm:
+        formula.sideShapingBellyPoint.xMm,
+
+      yMm:
+        formula.sideShapingBellyPoint.yMm,
+    })
+
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .backHemOneThird,
+
+      name:
+        'V2 Back Hem 1/3',
+
+      xMm:
+        formula.backHemOneThirdPoint.xMm,
+
+      yMm:
+        formula.backHemOneThirdPoint.yMm,
+    })
+
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .backHemTwoThirds,
+
+      name:
+        'V2 Back Hem 2/3',
+
+      xMm:
+        formula.backHemTwoThirdsPoint.xMm,
+
+      yMm:
+        formula.backHemTwoThirdsPoint.yMm,
+    })
+
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .femaleBellyEndpoint,
+
+      name:
+        'V2 Female Belly Endpoint',
+
+      xMm:
+        formula.femaleBellyEndpoint.xMm,
+
+      yMm:
+        formula.femaleBellyEndpoint.yMm,
+    })
+
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .maleBellyDefaultEndpoint,
+
+      name:
+        'V2 Male Belly Default Endpoint',
+
+      xMm:
+        formula.maleBellyDefaultEndpoint.xMm,
+
+      yMm:
+        formula.maleBellyDefaultEndpoint.yMm,
+    })
+
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .maleBellyUpperReference,
+
+      name:
+        'V2 Male Belly Upper Reference',
+
+      xMm:
+        formula.maleBellyUpperReference.xMm,
+
+      yMm:
+        formula.maleBellyUpperReference.yMm,
+    })
+
+  /*
    * ARMHOLE DEPTH ROW
    */
 
@@ -1757,6 +1962,50 @@ export function createReferenceTankV2Construction(
   /*
    * CONSTRUCTION LINES
    */
+
+  /*
+   * VIDEO-2 LOWER-BODY GUIDE LINES
+   *
+   * Use one vertical side axis and one
+   * 2 cm shaping-width marker only.
+   * Avoid full-width 2/5, 3/5 and 4/5
+   * lines so the workspace stays clear.
+   */
+  document =
+    addLine(document, {
+      id:
+        REFERENCE_TANK_V2_LINE_IDS
+          .lowerBodySideAxis,
+
+      name:
+        'V2 Lower Body Side Axis',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .commonArmpit,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .sideAxisFourFifths,
+    })
+
+  document =
+    addLine(document, {
+      id:
+        REFERENCE_TANK_V2_LINE_IDS
+          .sideShapingWidth,
+
+      name:
+        'V2 Side Shaping Width 2 cm',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .sideShapingBack,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .sideShapingBelly,
+    })
 
   document =
     addLine(document, {

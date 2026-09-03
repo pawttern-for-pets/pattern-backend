@@ -129,7 +129,7 @@ describe(
     }
 
     it(
-      'creates the V2 construction document with two neckline curves and four smooth five-point armhole spline segments',
+      'creates the V2 construction document with the approved upper block plus lower-body scaffold references',
       () => {
         const result =
           createReferenceTankV2Construction(
@@ -141,19 +141,331 @@ describe(
           Object.keys(
             result.document.points,
           ),
-        ).toHaveLength(16)
+        ).toHaveLength(26)
 
         expect(
           Object.keys(
             result.document.lines,
           ),
-        ).toHaveLength(9)
+        ).toHaveLength(11)
 
         expect(
           Object.keys(
             result.document.curves,
           ),
         ).toHaveLength(6)
+      },
+    )
+
+    it(
+      'places the 2/5, 3/5, and 4/5 Back-Length references on the Common Armpit vertical axis',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        expect(
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .sideAxisTwoFifths
+          ],
+        ).toMatchObject({
+          xMm:
+            114,
+
+          yMm:
+            88,
+        })
+
+        expect(
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .sideAxisThreeFifths
+          ],
+        ).toMatchObject({
+          xMm:
+            114,
+
+          yMm:
+            132,
+        })
+
+        expect(
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .sideAxisFourFifths
+          ],
+        ).toMatchObject({
+          xMm:
+            114,
+
+          yMm:
+            176,
+        })
+      },
+    )
+
+    it(
+      'places the two Video-2 side-shaping points exactly 2 cm apart at 7B/10',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        expect(
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .sideShapingBack
+          ],
+        ).toMatchObject({
+          xMm:
+            104,
+
+          yMm:
+            154,
+        })
+
+        expect(
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .sideShapingBelly
+          ],
+        ).toMatchObject({
+          xMm:
+            124,
+
+          yMm:
+            154,
+        })
+
+        const shapingLine =
+          result.document.lines[
+            REFERENCE_TANK_V2_LINE_IDS
+              .sideShapingWidth
+          ]
+
+        expect(
+          shapingLine.startPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .sideShapingBack,
+        )
+
+        expect(
+          shapingLine.endPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .sideShapingBelly,
+        )
+
+        expect(
+          lineLengthMm(
+            shapingLine,
+            result.document.points,
+          ),
+        ).toBeCloseTo(
+          20,
+          8,
+        )
+      },
+    )
+
+    it(
+      'places the one-third and two-thirds Back hem construction references at full Back Length',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        expect(
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .backHemOneThird
+          ],
+        ).toMatchObject({
+          xMm:
+            38,
+
+          yMm:
+            220,
+        })
+
+        expect(
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .backHemTwoThirds
+          ],
+        ).toMatchObject({
+          xMm:
+            76,
+
+          yMm:
+            220,
+        })
+      },
+    )
+
+    it(
+      'places the female and male belly-edge references on the Front Center edge',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        expect(
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .femaleBellyEndpoint
+          ],
+        ).toMatchObject({
+          xMm:
+            190,
+
+          yMm:
+            132,
+        })
+
+        expect(
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .maleBellyDefaultEndpoint
+          ],
+        ).toMatchObject({
+          xMm:
+            190,
+
+          yMm:
+            110,
+        })
+
+        expect(
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .maleBellyUpperReference
+          ],
+        ).toMatchObject({
+          xMm:
+            190,
+
+          yMm:
+            88,
+        })
+      },
+    )
+
+    it(
+      'uses one vertical lower-body side axis and does not add finished lower-body curves yet',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const sideAxis =
+          result.document.lines[
+            REFERENCE_TANK_V2_LINE_IDS
+              .lowerBodySideAxis
+          ]
+
+        expect(
+          sideAxis.startPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .commonArmpit,
+        )
+
+        expect(
+          sideAxis.endPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .sideAxisFourFifths,
+        )
+
+        expect(
+          lineLengthMm(
+            sideAxis,
+            result.document.points,
+          ),
+        ).toBeCloseTo(
+          132,
+          8,
+        )
+
+        /*
+         * The approved document still has
+         * only the two neckline curves and
+         * four armhole spline segments.
+         *
+         * No lower-body finished curve is
+         * allowed in this scaffold-only
+         * milestone.
+         */
+        expect(
+          Object.keys(
+            result.document.curves,
+          ),
+        ).toHaveLength(6)
+
+        const lowerBodyPointIds =
+          new Set<string>([
+            REFERENCE_TANK_V2_POINT_IDS
+              .sideAxisTwoFifths,
+
+            REFERENCE_TANK_V2_POINT_IDS
+              .sideAxisThreeFifths,
+
+            REFERENCE_TANK_V2_POINT_IDS
+              .sideAxisFourFifths,
+
+            REFERENCE_TANK_V2_POINT_IDS
+              .sideShapingBack,
+
+            REFERENCE_TANK_V2_POINT_IDS
+              .sideShapingBelly,
+
+            REFERENCE_TANK_V2_POINT_IDS
+              .backHemOneThird,
+
+            REFERENCE_TANK_V2_POINT_IDS
+              .backHemTwoThirds,
+
+            REFERENCE_TANK_V2_POINT_IDS
+              .femaleBellyEndpoint,
+
+            REFERENCE_TANK_V2_POINT_IDS
+              .maleBellyDefaultEndpoint,
+
+            REFERENCE_TANK_V2_POINT_IDS
+              .maleBellyUpperReference,
+          ])
+
+        for (
+          const curve
+          of Object.values(
+            result.document.curves,
+          )
+        ) {
+          expect(
+            lowerBodyPointIds.has(
+              curve.startPointId,
+            ),
+          ).toBe(false)
+
+          expect(
+            lowerBodyPointIds.has(
+              curve.endPointId,
+            ),
+          ).toBe(false)
+        }
       },
     )
 

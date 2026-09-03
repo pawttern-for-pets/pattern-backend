@@ -11,6 +11,7 @@ import {
 import {
   createReferenceTankV2Formula,
   PAWTTERN_MASTER_V2_RULE_VERSION,
+  REFERENCE_TANK_V2_SIDE_SHAPING_HALF_WIDTH_MM,
 } from './referenceTankV2Formula'
 
 describe(
@@ -553,6 +554,331 @@ describe(
         expect(
           result.neckGeometryScale,
         ).toBe(1.25)
+      },
+    )
+
+    it(
+      'calculates the Video-2 lower-body Back-Length scaffold levels',
+      () => {
+        const result =
+          createReferenceTankV2Formula(
+            measurements,
+            options,
+          )
+
+        expect(
+          result.backLengthTwoFifthsMm,
+        ).toBe(88)
+
+        expect(
+          result.backLengthThreeFifthsMm,
+        ).toBe(132)
+
+        expect(
+          result.backLengthFourFifthsMm,
+        ).toBe(176)
+
+        expect(
+          result.sideShapingBaseYMm,
+        ).toBe(154)
+      },
+    )
+
+    it(
+      'places the two Video-2 side-shaping points 1 cm on each side of the Common Armpit axis',
+      () => {
+        const result =
+          createReferenceTankV2Formula(
+            measurements,
+            options,
+          )
+
+        expect(
+          REFERENCE_TANK_V2_SIDE_SHAPING_HALF_WIDTH_MM,
+        ).toBe(10)
+
+        expect(
+          result.sideShapingHalfWidthMm,
+        ).toBe(10)
+
+        expect(
+          result.sideShapingBackPoint,
+        ).toEqual({
+          xMm:
+            104,
+
+          yMm:
+            154,
+        })
+
+        expect(
+          result.sideShapingBellyPoint,
+        ).toEqual({
+          xMm:
+            124,
+
+          yMm:
+            154,
+        })
+
+        expect(
+          result.sideShapingBellyPoint.xMm -
+          result.sideShapingBackPoint.xMm,
+        ).toBe(20)
+      },
+    )
+
+    it(
+      'calculates the one-third and two-thirds Back hem construction references',
+      () => {
+        const result =
+          createReferenceTankV2Formula(
+            measurements,
+            options,
+          )
+
+        expect(
+          result.backHemOneThirdPoint,
+        ).toEqual({
+          xMm:
+            38,
+
+          yMm:
+            220,
+        })
+
+        expect(
+          result.backHemTwoThirdsPoint,
+        ).toEqual({
+          xMm:
+            76,
+
+          yMm:
+            220,
+        })
+
+        expect(
+          result.backHemOneThirdPoint.xMm,
+        ).toBeLessThan(
+          result.backHemTwoThirdsPoint.xMm,
+        )
+
+        expect(
+          result.backHemTwoThirdsPoint.xMm,
+        ).toBeLessThan(
+          result.commonArmpitXMm,
+        )
+      },
+    )
+
+    it(
+      'calculates the Video-2 female and male belly-edge reference levels',
+      () => {
+        const result =
+          createReferenceTankV2Formula(
+            measurements,
+            options,
+          )
+
+        expect(
+          result.femaleBellyEndpoint,
+        ).toEqual({
+          xMm:
+            190,
+
+          yMm:
+            132,
+        })
+
+        expect(
+          result.maleBellyDefaultEndpoint,
+        ).toEqual({
+          xMm:
+            190,
+
+          yMm:
+            110,
+        })
+
+        expect(
+          result.maleBellyUpperReference,
+        ).toEqual({
+          xMm:
+            190,
+
+          yMm:
+            88,
+        })
+
+        expect(
+          result.maleBellyUpperReference.yMm,
+        ).toBeLessThan(
+          result.maleBellyDefaultEndpoint.yMm,
+        )
+
+        expect(
+          result.maleBellyDefaultEndpoint.yMm,
+        ).toBeLessThan(
+          result.femaleBellyEndpoint.yMm,
+        )
+      },
+    )
+
+    it(
+      'keeps the lower-body scaffold proportional across different Back-Length and Chest proportions',
+      () => {
+        const cases = [
+          {
+            measurements:
+              createBodyMeasurementsFromCm({
+                backLengthCm:
+                  38,
+
+                chestGirthCm:
+                  40,
+
+                neckGirthCm:
+                  28,
+              }),
+
+            halfBodyAllowanceMm:
+              10,
+
+            shoulderLengthMm:
+              40,
+          },
+
+          {
+            measurements:
+              createBodyMeasurementsFromCm({
+                backLengthCm:
+                  18,
+
+                chestGirthCm:
+                  52,
+
+                neckGirthCm:
+                  34,
+              }),
+
+            halfBodyAllowanceMm:
+              10,
+
+            shoulderLengthMm:
+              35,
+          },
+        ]
+
+        for (
+          const testCase
+          of cases
+        ) {
+          const result =
+            createReferenceTankV2Formula(
+              testCase.measurements,
+              {
+                halfBodyAllowanceMm:
+                  testCase.halfBodyAllowanceMm,
+
+                shoulderLengthMm:
+                  testCase.shoulderLengthMm,
+              },
+            )
+
+          expect(
+            result.backLengthTwoFifthsMm,
+          ).toBeCloseTo(
+            2 *
+            result.backLengthMm /
+            5,
+            8,
+          )
+
+          expect(
+            result.backLengthThreeFifthsMm,
+          ).toBeCloseTo(
+            3 *
+            result.backLengthMm /
+            5,
+            8,
+          )
+
+          expect(
+            result.backLengthFourFifthsMm,
+          ).toBeCloseTo(
+            4 *
+            result.backLengthMm /
+            5,
+            8,
+          )
+
+          expect(
+            result.sideShapingBaseYMm,
+          ).toBeCloseTo(
+            7 *
+            result.backLengthMm /
+            10,
+            8,
+          )
+
+          expect(
+            result.sideShapingBackPoint.xMm,
+          ).toBeCloseTo(
+            result.commonArmpitXMm -
+            10,
+            8,
+          )
+
+          expect(
+            result.sideShapingBellyPoint.xMm,
+          ).toBeCloseTo(
+            result.commonArmpitXMm +
+            10,
+            8,
+          )
+
+          expect(
+            result.sideShapingBackPoint.xMm,
+          ).toBeGreaterThan(0)
+
+          expect(
+            result.sideShapingBellyPoint.xMm,
+          ).toBeLessThan(
+            result.halfBodyWidthMm,
+          )
+        }
+      },
+    )
+
+    it(
+      'rejects a half-body width too narrow for the fixed Video-2 side-shaping rule',
+      () => {
+        const narrowMeasurements =
+          createBodyMeasurementsFromCm({
+            backLengthCm:
+              22,
+
+            chestGirthCm:
+              4,
+
+            neckGirthCm:
+              3,
+          })
+
+        expect(() =>
+          createReferenceTankV2Formula(
+            narrowMeasurements,
+            {
+              halfBodyAllowanceMm:
+                0,
+
+              shoulderLengthMm:
+                10,
+            },
+          ),
+        ).toThrow(
+          /side-shaping points do not fit inside the generated half-body width/i,
+        )
       },
     )
 
