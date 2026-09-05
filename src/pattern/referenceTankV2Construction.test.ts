@@ -129,7 +129,7 @@ describe(
     }
 
     it(
-      'creates the V2 construction document with the approved upper block plus lower-body scaffold references',
+      'creates the V2 construction document with the approved upper block, lower-body scaffold, and finished lower-back edge',
       () => {
         const result =
           createReferenceTankV2Construction(
@@ -141,19 +141,19 @@ describe(
           Object.keys(
             result.document.points,
           ),
-        ).toHaveLength(26)
+        ).toHaveLength(27)
 
         expect(
           Object.keys(
             result.document.lines,
           ),
-        ).toHaveLength(11)
+        ).toHaveLength(12)
 
         expect(
           Object.keys(
             result.document.curves,
           ),
-        ).toHaveLength(6)
+        ).toHaveLength(8)
       },
     )
 
@@ -362,7 +362,7 @@ describe(
     )
 
     it(
-      'uses one vertical lower-body side axis and does not add finished lower-body curves yet',
+      'keeps one vertical lower-body side axis while integrating only the finished Back lower edge',
       () => {
         const result =
           createReferenceTankV2Construction(
@@ -401,42 +401,24 @@ describe(
         )
 
         /*
-         * The approved document still has
-         * only the two neckline curves and
-         * four armhole spline segments.
+         * Two lower-back curves are now
+         * integrated in addition to the
+         * two neckline and four armhole
+         * curves.
          *
-         * No lower-body finished curve is
-         * allowed in this scaffold-only
-         * milestone.
+         * Belly-edge curves remain
+         * intentionally deferred.
          */
         expect(
           Object.keys(
             result.document.curves,
           ),
-        ).toHaveLength(6)
+        ).toHaveLength(8)
 
-        const lowerBodyPointIds =
+        const bellyReferenceIds =
           new Set<string>([
             REFERENCE_TANK_V2_POINT_IDS
-              .sideAxisTwoFifths,
-
-            REFERENCE_TANK_V2_POINT_IDS
-              .sideAxisThreeFifths,
-
-            REFERENCE_TANK_V2_POINT_IDS
-              .sideAxisFourFifths,
-
-            REFERENCE_TANK_V2_POINT_IDS
-              .sideShapingBack,
-
-            REFERENCE_TANK_V2_POINT_IDS
               .sideShapingBelly,
-
-            REFERENCE_TANK_V2_POINT_IDS
-              .backHemOneThird,
-
-            REFERENCE_TANK_V2_POINT_IDS
-              .backHemTwoThirds,
 
             REFERENCE_TANK_V2_POINT_IDS
               .femaleBellyEndpoint,
@@ -455,17 +437,255 @@ describe(
           )
         ) {
           expect(
-            lowerBodyPointIds.has(
+            bellyReferenceIds.has(
               curve.startPointId,
             ),
           ).toBe(false)
 
           expect(
-            lowerBodyPointIds.has(
+            bellyReferenceIds.has(
               curve.endPointId,
             ),
           ).toBe(false)
         }
+      },
+    )
+
+    it(
+      'places the source-derived 0.5 cm bowed lower-back midpoint at the expected B22 C36 position',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const midpoint =
+          result.document.points[
+            REFERENCE_TANK_V2_POINT_IDS
+              .lowerBackCurveMidpoint
+          ]
+
+        expect(
+          midpoint.xMm,
+        ).toBeCloseTo(
+          85.3970910906,
+          8,
+        )
+
+        expect(
+          midpoint.yMm,
+        ).toBeCloseTo(
+          185.0472507657,
+          8,
+        )
+
+        /*
+         * The midpoint bows toward
+         * Back Center compared with the
+         * straight-guide midpoint X=90.
+         */
+        expect(
+          midpoint.xMm,
+        ).toBeLessThan(90)
+      },
+    )
+
+    it(
+      'connects the finished lower-back edge through the bowed midpoint to Back Hem 1/3 while keeping Back Hem 2/3 construction-only',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const upperCurve =
+          result.document.curves[
+            REFERENCE_TANK_V2_CURVE_IDS
+              .lowerBackUpper
+          ]
+
+        const hemBlendCurve =
+          result.document.curves[
+            REFERENCE_TANK_V2_CURVE_IDS
+              .lowerBackHemBlend
+          ]
+
+        expect(
+          upperCurve.startPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .sideShapingBack,
+        )
+
+        expect(
+          upperCurve.endPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .lowerBackCurveMidpoint,
+        )
+
+        expect(
+          hemBlendCurve.startPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .lowerBackCurveMidpoint,
+        )
+
+        expect(
+          hemBlendCurve.endPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .backHemOneThird,
+        )
+
+        /*
+         * Video-2 Back Hem 2/3 is only
+         * a temporary French-curve target.
+         * It must not become a finished
+         * lower-back curve endpoint.
+         */
+        expect(
+          Object.values(
+            result.document.curves,
+          ).some(
+            (curve) =>
+              curve.startPointId ===
+                REFERENCE_TANK_V2_POINT_IDS
+                  .backHemTwoThirds ||
+              curve.endPointId ===
+                REFERENCE_TANK_V2_POINT_IDS
+                  .backHemTwoThirds,
+          ),
+        ).toBe(false)
+      },
+    )
+
+    it(
+      'keeps the finished lower-back join tangent-smooth and arrives horizontally at Back Hem 1/3',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const upperGeometry =
+          resolveCubicBezierGeometry(
+            result.document.curves[
+              REFERENCE_TANK_V2_CURVE_IDS
+                .lowerBackUpper
+            ],
+            result.document.points,
+          )
+
+        const hemBlendGeometry =
+          resolveCubicBezierGeometry(
+            result.document.curves[
+              REFERENCE_TANK_V2_CURVE_IDS
+                .lowerBackHemBlend
+            ],
+            result.document.points,
+          )
+
+        expectSameTangentDirection(
+          cubicBezierDerivative(
+            upperGeometry,
+            1,
+          ),
+
+          cubicBezierDerivative(
+            hemBlendGeometry,
+            0,
+          ),
+        )
+
+        const hemTangent =
+          cubicBezierDerivative(
+            hemBlendGeometry,
+            1,
+          )
+
+        expect(
+          hemTangent.yMm,
+        ).toBeCloseTo(
+          0,
+          8,
+        )
+
+        expect(
+          hemTangent.xMm,
+        ).toBeLessThan(0)
+      },
+    )
+
+    it(
+      'connects Back Length Bottom directly to Back Hem 1/3 as the finished straight Back hem',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const backHemLine =
+          result.document.lines[
+            REFERENCE_TANK_V2_LINE_IDS
+              .backHemCenterToOneThird
+          ]
+
+        expect(
+          backHemLine.startPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .backBottom,
+        )
+
+        expect(
+          backHemLine.endPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .backHemOneThird,
+        )
+
+        /*
+         * Reference block:
+         *
+         * Back Bottom = (0, 220)
+         * Back Hem 1/3 = (38, 220)
+         *
+         * Therefore the finished straight
+         * hem segment is exactly 38 mm.
+         */
+        expect(
+          lineLengthMm(
+            backHemLine,
+            result.document.points,
+          ),
+        ).toBeCloseTo(
+          38,
+          8,
+        )
+
+        /*
+         * Back Hem 2/3 must remain
+         * construction-only and must not
+         * be part of this finished hem.
+         */
+        expect(
+          backHemLine.startPointId,
+        ).not.toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .backHemTwoThirds,
+        )
+
+        expect(
+          backHemLine.endPointId,
+        ).not.toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .backHemTwoThirds,
+        )
       },
     )
 

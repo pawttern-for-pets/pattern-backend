@@ -29,6 +29,10 @@ import {
   type ReferenceTankV2FormulaOptions,
 } from './referenceTankV2Formula'
 
+import {
+  createReferenceTankV2LowerBackGeometry,
+} from './referenceTankV2LowerBackGeometry'
+
 /*
  * PAWTTERN MASTER BLOCK V2
  *
@@ -133,6 +137,9 @@ export const REFERENCE_TANK_V2_POINT_IDS = {
 
   maleBellyUpperReference:
     'V2_MALE_BELLY_UPPER_REFERENCE',
+
+  lowerBackCurveMidpoint:
+    'V2_LOWER_BACK_CURVE_MIDPOINT',
 } as const
 
 export const REFERENCE_TANK_V2_LINE_IDS = {
@@ -168,6 +175,9 @@ export const REFERENCE_TANK_V2_LINE_IDS = {
 
   sideShapingWidth:
     'V2_SIDE_SHAPING_WIDTH',
+
+  backHemCenterToOneThird:
+    'V2_BACK_HEM_CENTER_TO_ONE_THIRD',
 } as const
 
 export const REFERENCE_TANK_V2_CURVE_IDS = {
@@ -188,6 +198,12 @@ export const REFERENCE_TANK_V2_CURVE_IDS = {
 
   frontArmholePivotToShoulder:
     'V2_FRONT_ARMHOLE_PIVOT_TO_SHOULDER',
+
+  lowerBackUpper:
+    'V2_LOWER_BACK_UPPER',
+
+  lowerBackHemBlend:
+    'V2_LOWER_BACK_HEM_BLEND',
 } as const
 
 export interface ReferenceTankV2ConstructionOptions
@@ -1209,6 +1225,33 @@ export function createReferenceTankV2Construction(
       formula,
     )
 
+  /*
+   * VIDEO-2 LOWER-BACK GEOMETRY
+   *
+   * This uses the separately tested
+   * pure geometry proof:
+   *
+   * Side Shaping Back
+   * -> temporary Back Hem 2/3 guide
+   * -> exact 5 mm midpoint bow
+   * -> retain the upper half
+   * -> smooth blend to Back Hem 1/3.
+   *
+   * Back Hem 2/3 remains construction
+   * only and is NOT a finished endpoint.
+   */
+  const lowerBackGeometry =
+    createReferenceTankV2LowerBackGeometry({
+      sideShapingBackPoint:
+        formula.sideShapingBackPoint,
+
+      backHemTwoThirdsPoint:
+        formula.backHemTwoThirdsPoint,
+
+      backHemOneThirdPoint:
+        formula.backHemOneThirdPoint,
+    })
+
   let document =
     createEmptyDocument()
 
@@ -1415,6 +1458,34 @@ export function createReferenceTankV2Construction(
 
       yMm:
         formula.maleBellyUpperReference.yMm,
+    })
+
+  /*
+   * FINISHED LOWER-BACK MIDPOINT
+   *
+   * This is the source-derived 0.5 cm
+   * bowed midpoint retained from the
+   * temporary Side-Shaping-Back to
+   * Back-Hem-2/3 French-curve operation.
+   */
+  document =
+    addPoint(document, {
+      id:
+        REFERENCE_TANK_V2_POINT_IDS
+          .lowerBackCurveMidpoint,
+
+      name:
+        'V2 Lower Back Curve Midpoint',
+
+      xMm:
+        lowerBackGeometry
+          .bowedCurveMidpoint
+          .xMm,
+
+      yMm:
+        lowerBackGeometry
+          .bowedCurveMidpoint
+          .yMm,
     })
 
   /*
@@ -1840,6 +1911,81 @@ export function createReferenceTankV2Construction(
     })
 
   /*
+   * FINISHED VIDEO-2 LOWER-BACK EDGE
+   *
+   * Two cubic Bezier segments are exact
+   * cubic representations of the proven
+   * quadratic construction.
+   *
+   * Segment 1:
+   * Side Shaping Back
+   * -> 0.5 cm bowed midpoint
+   *
+   * Segment 2:
+   * bowed midpoint
+   * -> Back Hem 1/3
+   *
+   * The temporary Back Hem 2/3 point is
+   * deliberately NOT part of the finished
+   * lower-back edge.
+   */
+  document =
+    addCurve(document, {
+      id:
+        REFERENCE_TANK_V2_CURVE_IDS
+          .lowerBackUpper,
+
+      name:
+        'V2 Lower Back Upper',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .sideShapingBack,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .lowerBackCurveMidpoint,
+
+      control1:
+        lowerBackGeometry
+          .retainedUpperCurve
+          .control1,
+
+      control2:
+        lowerBackGeometry
+          .retainedUpperCurve
+          .control2,
+    })
+
+  document =
+    addCurve(document, {
+      id:
+        REFERENCE_TANK_V2_CURVE_IDS
+          .lowerBackHemBlend,
+
+      name:
+        'V2 Lower Back Hem Blend',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .lowerBackCurveMidpoint,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .backHemOneThird,
+
+      control1:
+        lowerBackGeometry
+          .finalHemBlendCurve
+          .control1,
+
+      control2:
+        lowerBackGeometry
+          .finalHemBlendCurve
+          .control2,
+    })
+
+  /*
    * ARMHOLE QA METRICS
    *
    * The Master Block armhole is fixed
@@ -2023,6 +2169,37 @@ export function createReferenceTankV2Construction(
       endPointId:
         REFERENCE_TANK_V2_POINT_IDS
           .backBottom,
+    })
+
+  /*
+   * FINISHED BACK HEM
+   *
+   * Video 2 keeps the straight hem edge
+   * from Back Center / Back Length Bottom
+   * to the Back Hem 1/3 point.
+   *
+   * The lower-back curved edge then
+   * continues from Back Hem 1/3 upward
+   * toward the Side Shaping Back point.
+   *
+   * Back Hem 2/3 remains construction-only.
+   */
+  document =
+    addLine(document, {
+      id:
+        REFERENCE_TANK_V2_LINE_IDS
+          .backHemCenterToOneThird,
+
+      name:
+        'V2 Back Hem Center to 1/3',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .backBottom,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .backHemOneThird,
     })
 
   document =
