@@ -16,6 +16,7 @@ import {
 import {
   createReferenceTankV2Construction,
   REFERENCE_TANK_V2_CURVE_IDS,
+  REFERENCE_TANK_V2_LINE_IDS,
   REFERENCE_TANK_V2_POINT_IDS,
 } from './referenceTankV2Construction'
 
@@ -1438,7 +1439,7 @@ describe(
     )
 
     it(
-      'allows editing unrelated non-protected geometry',
+      'rejects manually moving a generated lower-body shaping point',
       () => {
         const project =
           createGeneratedProject(
@@ -1447,7 +1448,7 @@ describe(
 
         const pointId =
           REFERENCE_TANK_V2_POINT_IDS
-            .backBottom
+            .sideShapingBack
 
         const point =
           project.document.points[
@@ -1464,9 +1465,9 @@ describe(
             [pointId]: {
               ...point,
 
-              yMm:
-                point.yMm +
-                10,
+              xMm:
+                point.xMm +
+                5,
             },
           },
         }
@@ -1474,6 +1475,379 @@ describe(
         const result =
           validateReferenceTankV2DocumentEdit(
             project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /cannot be moved manually/i,
+        )
+      },
+    )
+
+    it(
+      'rejects deleting the generated lower-back curve midpoint',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const pointId =
+          REFERENCE_TANK_V2_POINT_IDS
+            .lowerBackCurveMidpoint
+
+        const remainingPoints = {
+          ...project.document.points,
+        }
+
+        delete remainingPoints[
+          pointId
+        ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          points:
+            remainingPoints,
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /cannot be deleted/i,
+        )
+      },
+    )
+
+    it(
+      'rejects deleting a generated lower-body construction line',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const lineId =
+          REFERENCE_TANK_V2_LINE_IDS
+            .lowerBodySideAxis
+
+        const remainingLines = {
+          ...project.document.lines,
+        }
+
+        delete remainingLines[
+          lineId
+        ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          lines:
+            remainingLines,
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /lower-body line.*cannot be deleted/i,
+        )
+      },
+    )
+
+    it(
+      'rejects reassigning a generated lower-body construction line endpoint',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const lineId =
+          REFERENCE_TANK_V2_LINE_IDS
+            .backHemCenterToOneThird
+
+        const line =
+          project.document.lines[
+            lineId
+          ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          lines: {
+            ...project.document
+              .lines,
+
+            [lineId]: {
+              ...line,
+
+              endPointId:
+                REFERENCE_TANK_V2_POINT_IDS
+                  .backHemTwoThirds,
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /lower-body line.*cannot be edited manually/i,
+        )
+      },
+    )
+
+    it(
+      'rejects deleting a generated lower-back curve',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const curveId =
+          REFERENCE_TANK_V2_CURVE_IDS
+            .lowerBackUpper
+
+        const remainingCurves = {
+          ...project.document.curves,
+        }
+
+        delete remainingCurves[
+          curveId
+        ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          curves:
+            remainingCurves,
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /lower-back curve.*cannot be deleted/i,
+        )
+      },
+    )
+
+    it(
+      'rejects editing a generated lower-back Bezier control',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const curveId =
+          REFERENCE_TANK_V2_CURVE_IDS
+            .lowerBackHemBlend
+
+        const curve =
+          project.document.curves[
+            curveId
+          ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          curves: {
+            ...project.document
+              .curves,
+
+            [curveId]: {
+              ...curve,
+
+              control1: {
+                ...curve.control1,
+
+                xMm:
+                  curve.control1.xMm +
+                  1,
+              },
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /lower-back curve.*cannot be edited manually/i,
+        )
+      },
+    )
+
+    it(
+      'rejects reassigning a generated lower-back curve endpoint',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const curveId =
+          REFERENCE_TANK_V2_CURVE_IDS
+            .lowerBackUpper
+
+        const curve =
+          project.document.curves[
+            curveId
+          ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          curves: {
+            ...project.document
+              .curves,
+
+            [curveId]: {
+              ...curve,
+
+              endPointId:
+                REFERENCE_TANK_V2_POINT_IDS
+                  .backHemTwoThirds,
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /lower-back curve.*cannot be edited manually/i,
+        )
+      },
+    )
+
+    it(
+      'allows editing unrelated non-protected manual geometry',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const manualPointId =
+          'MANUAL_TEST_POINT'
+
+        const projectWithManualPoint = {
+          ...project,
+
+          document: {
+            ...project.document,
+
+            points: {
+              ...project.document
+                .points,
+
+              [manualPointId]: {
+                id:
+                  manualPointId,
+
+                name:
+                  'Manual Test Point',
+
+                xMm:
+                  10,
+
+                yMm:
+                  10,
+              },
+            },
+          },
+        }
+
+        const candidateDocument = {
+          ...projectWithManualPoint
+            .document,
+
+          points: {
+            ...projectWithManualPoint
+              .document
+              .points,
+
+            [manualPointId]: {
+              ...projectWithManualPoint
+                .document
+                .points[
+                  manualPointId
+                ],
+
+              yMm:
+                20,
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            projectWithManualPoint,
             candidateDocument,
           )
 

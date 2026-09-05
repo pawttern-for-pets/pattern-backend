@@ -20,6 +20,7 @@ import {
 
 import {
   REFERENCE_TANK_V2_CURVE_IDS,
+  REFERENCE_TANK_V2_LINE_IDS,
   REFERENCE_TANK_V2_NECKLINE_LENGTH_SEGMENTS,
   REFERENCE_TANK_V2_POINT_IDS,
 } from './referenceTankV2Construction'
@@ -50,6 +51,25 @@ const PROTECTED_GENERATED_POINT_IDS = [
   REFERENCE_TANK_V2_POINT_IDS.frontArmholePivot,
   REFERENCE_TANK_V2_POINT_IDS.frontArmGuide,
   REFERENCE_TANK_V2_POINT_IDS.frontArmholeLevel,
+
+  /*
+   * VIDEO-2 LOWER BODY
+   *
+   * Generated lower-body references must
+   * stay tied to the parametric formula.
+   */
+  REFERENCE_TANK_V2_POINT_IDS.backBottom,
+  REFERENCE_TANK_V2_POINT_IDS.sideAxisTwoFifths,
+  REFERENCE_TANK_V2_POINT_IDS.sideAxisThreeFifths,
+  REFERENCE_TANK_V2_POINT_IDS.sideAxisFourFifths,
+  REFERENCE_TANK_V2_POINT_IDS.sideShapingBack,
+  REFERENCE_TANK_V2_POINT_IDS.sideShapingBelly,
+  REFERENCE_TANK_V2_POINT_IDS.backHemOneThird,
+  REFERENCE_TANK_V2_POINT_IDS.backHemTwoThirds,
+  REFERENCE_TANK_V2_POINT_IDS.femaleBellyEndpoint,
+  REFERENCE_TANK_V2_POINT_IDS.maleBellyDefaultEndpoint,
+  REFERENCE_TANK_V2_POINT_IDS.maleBellyUpperReference,
+  REFERENCE_TANK_V2_POINT_IDS.lowerBackCurveMidpoint,
 ] as const
 
 const PROTECTED_ARMHOLE_CURVE_IDS = [
@@ -64,6 +84,25 @@ const PROTECTED_ARMHOLE_CURVE_IDS = [
 
   REFERENCE_TANK_V2_CURVE_IDS
     .frontArmholePivotToShoulder,
+] as const
+
+const PROTECTED_LOWER_BACK_CURVE_IDS = [
+  REFERENCE_TANK_V2_CURVE_IDS
+    .lowerBackUpper,
+
+  REFERENCE_TANK_V2_CURVE_IDS
+    .lowerBackHemBlend,
+] as const
+
+const PROTECTED_LOWER_BODY_LINE_IDS = [
+  REFERENCE_TANK_V2_LINE_IDS
+    .lowerBodySideAxis,
+
+  REFERENCE_TANK_V2_LINE_IDS
+    .sideShapingWidth,
+
+  REFERENCE_TANK_V2_LINE_IDS
+    .backHemCenterToOneThird,
 ] as const
 
 export interface ReferenceTankV2EditValidationResult {
@@ -235,6 +274,54 @@ function validateProtectedGeneratedPoints(
   return null
 }
 
+function validateProtectedLowerBodyLines(
+  currentDocument:
+    PatternDocument,
+
+  candidateDocument:
+    PatternDocument,
+): string | null {
+  for (
+    const lineId
+    of PROTECTED_LOWER_BODY_LINE_IDS
+  ) {
+    const currentLine =
+      currentDocument.lines[
+        lineId
+      ]
+
+    if (!currentLine) {
+      continue
+    }
+
+    const candidateLine =
+      candidateDocument.lines[
+        lineId
+      ]
+
+    if (!candidateLine) {
+      return (
+        `Generated lower-body line ${lineId} cannot be deleted. ` +
+        'Regenerate the parametric Master Block instead.'
+      )
+    }
+
+    if (
+      candidateLine.startPointId !==
+        currentLine.startPointId ||
+      candidateLine.endPointId !==
+        currentLine.endPointId
+    ) {
+      return (
+        `Generated lower-body line ${lineId} cannot be edited manually. ` +
+        'The V2 Master Block lower body is controlled by the Video-2 drafting formula.'
+      )
+    }
+  }
+
+  return null
+}
+
 function validateProtectedArmholeCurves(
   currentDocument:
     PatternDocument,
@@ -298,6 +385,76 @@ function validateProtectedArmholeCurves(
       return (
         `Generated armhole curve ${curveId} cannot be edited manually. ` +
         'The V2 Master Block armhole is controlled by the Video-2 drafting formula.'
+      )
+    }
+  }
+
+  return null
+}
+
+function validateProtectedLowerBackCurves(
+  currentDocument:
+    PatternDocument,
+
+  candidateDocument:
+    PatternDocument,
+): string | null {
+  for (
+    const curveId
+    of PROTECTED_LOWER_BACK_CURVE_IDS
+  ) {
+    const currentCurve =
+      currentDocument.curves[
+        curveId
+      ]
+
+    if (!currentCurve) {
+      continue
+    }
+
+    const candidateCurve =
+      candidateDocument.curves[
+        curveId
+      ]
+
+    if (!candidateCurve) {
+      return (
+        `Generated lower-back curve ${curveId} cannot be deleted. ` +
+        'Regenerate the parametric Master Block instead.'
+      )
+    }
+
+    const endpointsChanged =
+      candidateCurve.startPointId !==
+        currentCurve.startPointId ||
+      candidateCurve.endPointId !==
+        currentCurve.endPointId
+
+    const controlsChanged =
+      !isSameCoordinate(
+        candidateCurve.control1.xMm,
+        currentCurve.control1.xMm,
+      ) ||
+      !isSameCoordinate(
+        candidateCurve.control1.yMm,
+        currentCurve.control1.yMm,
+      ) ||
+      !isSameCoordinate(
+        candidateCurve.control2.xMm,
+        currentCurve.control2.xMm,
+      ) ||
+      !isSameCoordinate(
+        candidateCurve.control2.yMm,
+        currentCurve.control2.yMm,
+      )
+
+    if (
+      endpointsChanged ||
+      controlsChanged
+    ) {
+      return (
+        `Generated lower-back curve ${curveId} cannot be edited manually. ` +
+        'The V2 Master Block lower-back edge is controlled by the Video-2 drafting formula.'
       )
     }
   }
@@ -730,6 +887,30 @@ export function validateReferenceTankV2DocumentEdit(
     }
   }
 
+  const protectedLowerBodyLineError =
+    validateProtectedLowerBodyLines(
+      project.document,
+      candidateDocument,
+    )
+
+  if (
+    protectedLowerBodyLineError !==
+    null
+  ) {
+    return {
+      isValid:
+        false,
+
+      message:
+        protectedLowerBodyLineError,
+
+      finishedNeckOpeningMm:
+        null,
+
+      minimumNeckOpeningMm,
+    }
+  }
+
   const protectedArmholeCurveError =
     validateProtectedArmholeCurves(
       project.document,
@@ -746,6 +927,30 @@ export function validateReferenceTankV2DocumentEdit(
 
       message:
         protectedArmholeCurveError,
+
+      finishedNeckOpeningMm:
+        null,
+
+      minimumNeckOpeningMm,
+    }
+  }
+
+  const protectedLowerBackCurveError =
+    validateProtectedLowerBackCurves(
+      project.document,
+      candidateDocument,
+    )
+
+  if (
+    protectedLowerBackCurveError !==
+    null
+  ) {
+    return {
+      isValid:
+        false,
+
+      message:
+        protectedLowerBackCurveError,
 
       finishedNeckOpeningMm:
         null,
