@@ -109,11 +109,6 @@ interface ProjectState {
   hasSavedFile:
     boolean
 
-  /*
-   * New/Open increments this so
-   * CadCanvas receives a completely
-   * fresh temporary UI session.
-   */
   sessionId:
     number
 }
@@ -190,6 +185,18 @@ function App() {
     null,
   )
 
+  /*
+   * Workspace UI only.
+   *
+   * This is intentionally NOT part of
+   * PatternProject, Undo/Redo history,
+   * dirty-state tracking, or saved JSON.
+   */
+  const [
+    isPatternSidebarCollapsed,
+    setIsPatternSidebarCollapsed,
+  ] = useState(false)
+
   const fileAccessSupported =
     useMemo(
       () =>
@@ -206,17 +213,6 @@ function App() {
   const patternDocument =
     patternProject.document
 
-  /*
-   * Pattern layer decides which generated
-   * curves the generic CAD canvas must
-   * treat as read-only.
-   *
-   * The approved Video-2 Master Block
-   * armhole is formula-controlled.
-   *
-   * Manual/blank CAD documents remain
-   * fully editable.
-   */
   const readOnlyCurveIds =
     patternProject.draftingRuleVersion ===
       PAWTTERN_MASTER_V2_RULE_VERSION &&
@@ -249,7 +245,6 @@ function App() {
       }
 
       event.preventDefault()
-
       event.returnValue = ''
     }
 
@@ -268,17 +263,6 @@ function App() {
     hasUnsavedChanges,
   ])
 
-  /*
-   * ALL CAD DOCUMENT EDITS PASS HERE.
-   *
-   * CadCanvas remains a generic CAD
-   * component.
-   *
-   * PAWTTERN-specific pattern rules
-   * are enforced here before geometry
-   * is allowed into PatternProject
-   * history.
-   */
   const handleDocumentChange = (
     nextDocument:
       PatternDocument,
@@ -289,15 +273,6 @@ function App() {
         nextDocument,
       )
 
-    /*
-     * INVALID EDIT
-     *
-     * Do NOT change project state.
-     * Do NOT create an Undo step.
-     *
-     * CadCanvas will fall back to the
-     * existing valid PatternDocument.
-     */
     if (
       !validation.isValid
     ) {
@@ -346,22 +321,6 @@ function App() {
     setProjectMessage(null)
   }
 
-  /*
-   * GENERATE VIDEO-2 MASTER BLOCK
-   *
-   * One Generate action stores every
-   * parameter that produced the geometry:
-   *
-   * raw B / C / N
-   * half-body allowance
-   * shoulder length
-   * neck opening allowance
-   * drafting rule version
-   * generated CAD geometry
-   *
-   * Everything is committed as ONE
-   * PatternProject history action.
-   */
   const handleGenerateBaseBlock = (
     measurements:
       BodyMeasurements,
@@ -776,14 +735,7 @@ function App() {
           Foundation v0.1
         </span>
 
-        <div
-          style={{
-            display: 'flex',
-            alignItems:
-              'center',
-            gap: '6px',
-          }}
-        >
+        <div className="headerActions">
           <button
             type="button"
             onClick={
@@ -833,15 +785,11 @@ function App() {
         </div>
 
         <span
-          style={{
-            fontSize:
-              '12px',
-
-            fontWeight:
-              hasUnsavedChanges
-                ? 'bold'
-                : 'normal',
-          }}
+          className={
+            hasUnsavedChanges
+              ? 'projectStatus projectStatusUnsaved'
+              : 'projectStatus'
+          }
           title={
             project.fileName
           }
@@ -853,34 +801,22 @@ function App() {
 
         {projectMessage && (
           <span
-            style={{
-              fontSize:
-                '12px',
-
-              color:
-                projectMessage
-                  .toLowerCase()
-                  .includes(
-                    'rejected',
-                  )
-                  ? '#b00020'
-                  : undefined,
-            }}
+            className={
+              projectMessage
+                .toLowerCase()
+                .includes(
+                  'rejected',
+                )
+                ? 'projectMessage projectMessageError'
+                : 'projectMessage'
+            }
           >
             {projectMessage}
           </span>
         )}
 
         {!fileAccessSupported && (
-          <span
-            style={{
-              fontSize:
-                '12px',
-
-              color:
-                '#b00020',
-            }}
-          >
+          <span className="projectMessage projectMessageError">
             Direct project-file access is unavailable in this browser.
           </span>
         )}
@@ -913,65 +849,121 @@ function App() {
         </label>
       </header>
 
-      <PatternInputPanel
-        key={
-          `pattern-input-${project.sessionId}`
+      <div
+        className={
+          isPatternSidebarCollapsed
+            ? 'workspaceShell sidebarCollapsed'
+            : 'workspaceShell'
         }
-        measurements={
-          patternProject.measurements
-        }
-        halfBodyAllowanceMm={
-          patternProject
-            .halfBodyAllowanceMm
-        }
-        shoulderLengthMm={
-          patternProject
-            .shoulderLengthMm
-        }
-        neckOpeningAllowanceMm={
-          patternProject
-            .neckOpeningAllowanceMm
-        }
-        onGenerate={
-          handleGenerateBaseBlock
-        }
-      />
+      >
+        <aside className="patternSidebar">
+          {isPatternSidebarCollapsed ? (
+            <button
+              type="button"
+              className="sidebarExpandButton"
+              onClick={() =>
+                setIsPatternSidebarCollapsed(
+                  false,
+                )
+              }
+              title="Show measurements"
+              aria-label="Show measurements"
+            >
+              <span>
+                ▶
+              </span>
 
-      <main className="workspace">
-        <CadCanvas
-          key={
-            project.sessionId
-          }
-          document={
-            patternDocument
-          }
-          unit={
-            displayUnit
-          }
-          onDocumentChange={
-            handleDocumentChange
-          }
-          canUndo={
-            canUndo(
-              patternHistory,
-            )
-          }
-          canRedo={
-            canRedo(
-              patternHistory,
-            )
-          }
-          onUndo={
-            handleUndo
-          }
-          onRedo={
-            handleRedo
-          }
-          readOnlyCurveIds={
-            readOnlyCurveIds
-          }
-        />
-      </main>
+              <span className="sidebarVerticalLabel">
+                Measurements
+              </span>
+            </button>
+          ) : (
+            <>
+              <div className="patternSidebarHeader">
+                <strong>
+                  Measurements
+                </strong>
+
+                <button
+                  type="button"
+                  className="sidebarCollapseButton"
+                  onClick={() =>
+                    setIsPatternSidebarCollapsed(
+                      true,
+                    )
+                  }
+                  title="Hide measurements"
+                  aria-label="Hide measurements"
+                >
+                  ◀
+                </button>
+              </div>
+
+              <div className="patternSidebarContent">
+                <PatternInputPanel
+                  key={
+                    `pattern-input-${project.sessionId}`
+                  }
+                  measurements={
+                    patternProject.measurements
+                  }
+                  halfBodyAllowanceMm={
+                    patternProject
+                      .halfBodyAllowanceMm
+                  }
+                  shoulderLengthMm={
+                    patternProject
+                      .shoulderLengthMm
+                  }
+                  neckOpeningAllowanceMm={
+                    patternProject
+                      .neckOpeningAllowanceMm
+                  }
+                  onGenerate={
+                    handleGenerateBaseBlock
+                  }
+                />
+              </div>
+            </>
+          )}
+        </aside>
+
+        <main className="workspace">
+          <CadCanvas
+            key={
+              project.sessionId
+            }
+            document={
+              patternDocument
+            }
+            unit={
+              displayUnit
+            }
+            onDocumentChange={
+              handleDocumentChange
+            }
+            canUndo={
+              canUndo(
+                patternHistory,
+              )
+            }
+            canRedo={
+              canRedo(
+                patternHistory,
+              )
+            }
+            onUndo={
+              handleUndo
+            }
+            onRedo={
+              handleRedo
+            }
+            readOnlyCurveIds={
+              readOnlyCurveIds
+            }
+          />
+        </main>
+      </div>
     </div>
   )
 }

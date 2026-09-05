@@ -291,13 +291,6 @@ export function PatternInputPanel({
           },
         )
 
-      /*
-       * Pass every parameter that
-       * produced this geometry.
-       *
-       * App stores them atomically
-       * with the generated document.
-       */
       onGenerate(
         nextMeasurements,
         halfBodyAllowanceMm,
@@ -331,280 +324,243 @@ export function PatternInputPanel({
     halfBodyAllowanceMm * 2
 
   return (
-    <section
-      style={{
-        padding: '12px 16px',
-        borderBottom:
-          '1px solid #d7d7d7',
-        background: '#ffffff',
-      }}
-    >
+    <section className="patternInputPanel">
       <form
         onSubmit={
           handleSubmit
         }
+        className="patternInputForm"
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'end',
-            gap: '12px',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <strong>
-              Sleeveless Master Block
-            </strong>
+        <div className="patternInputIntro">
+          <strong>
+            Sleeveless Master Block
+          </strong>
 
-            <div
-              style={{
-                fontSize: '12px',
-                marginTop: '2px',
-              }}
-            >
-              Video Reference 2 · measurements in cm
-            </div>
+          <div className="patternInputSubtle">
+            Video Reference 2 · measurements in cm
           </div>
-
-          <label>
-            <div>
-              Back Length (B)
-            </div>
-
-            <input
-              type="number"
-              min="0.1"
-              step="0.1"
-              inputMode="decimal"
-              placeholder="e.g. 22"
-              value={
-                backLengthInput
-              }
-              onChange={(
-                event,
-              ) =>
-                setBackLengthInput(
-                  event.target.value,
-                )
-              }
-              style={{
-                width: '90px',
-              }}
-            />
-          </label>
-
-          <label>
-            <div>
-              Chest Girth (C)
-            </div>
-
-            <input
-              type="number"
-              min="0.1"
-              step="0.1"
-              inputMode="decimal"
-              placeholder="e.g. 36"
-              value={
-                chestGirthInput
-              }
-              onChange={(
-                event,
-              ) =>
-                setChestGirthInput(
-                  event.target.value,
-                )
-              }
-              style={{
-                width: '90px',
-              }}
-            />
-          </label>
-
-          <label>
-            <div>
-              Neck Girth (N)
-            </div>
-
-            <input
-              type="number"
-              min="0.1"
-              step="0.1"
-              inputMode="decimal"
-              placeholder="e.g. 27"
-              value={
-                neckGirthInput
-              }
-              onChange={(
-                event,
-              ) =>
-                setNeckGirthInput(
-                  event.target.value,
-                )
-              }
-              style={{
-                width: '90px',
-              }}
-            />
-          </label>
-
-          <label>
-            <div>
-              Shoulder Length
-            </div>
-
-            <input
-              type="number"
-              min="0.1"
-              step="0.1"
-              inputMode="decimal"
-              placeholder="e.g. 3.0"
-              value={
-                shoulderLengthInput
-              }
-              onChange={(
-                event,
-              ) =>
-                setShoulderLengthInput(
-                  event.target.value,
-                )
-              }
-              style={{
-                width: '90px',
-              }}
-            />
-
-            <div
-              style={{
-                fontSize: '10px',
-                marginTop: '2px',
-                maxWidth: '130px',
-              }}
-            >
-              Explicit — no automatic size assignment
-            </div>
-          </label>
-
-          <label>
-            <div>
-              Neck Opening +
-            </div>
-
-            <input
-              type="number"
-              min="0"
-              step="0.1"
-              inputMode="decimal"
-              placeholder="0"
-              value={
-                neckOpeningAllowanceInput
-              }
-              onChange={(
-                event,
-              ) =>
-                setNeckOpeningAllowanceInput(
-                  event.target.value,
-                )
-              }
-              style={{
-                width: '90px',
-              }}
-            />
-
-            <div
-              style={{
-                fontSize: '10px',
-                marginTop: '2px',
-                maxWidth: '130px',
-              }}
-            >
-              optional cm added to minimum opening
-            </div>
-          </label>
-
-          <div
-            style={{
-              padding: '5px 8px',
-              border:
-                '1px solid #d7d7d7',
-              borderRadius: '4px',
-              fontSize: '12px',
-              lineHeight: 1.35,
-              background: '#fafafa',
-            }}
-            title="Explicit body allowance. Raw Chest Girth C is unchanged."
-          >
-            <strong>
-              Body allowance
-            </strong>
-
-            <div>
-              Half-body:{' '}
-              {formatAllowanceCm(
-                halfBodyAllowanceMm,
-              )}
-            </div>
-
-            <div>
-              Finished circumference:{' '}
-              {formatAllowanceCm(
-                completedAllowanceMm,
-              )}
-            </div>
-          </div>
-
-          <div
-            style={{
-              padding: '5px 8px',
-              border:
-                '1px solid #d7d7d7',
-              borderRadius: '4px',
-              fontSize: '12px',
-              lineHeight: 1.35,
-              background: '#fafafa',
-              maxWidth: '210px',
-            }}
-            title="Reference checkpoints only. These do not automatically classify the dog."
-          >
-            <strong>
-              Shoulder reference
-            </strong>
-
-            <div>
-              S 2.5 · M 3.0 · L 4.0 · XL 4.5 cm
-            </div>
-
-            <div>
-              Construction angle: 45°
-            </div>
-
-            <div
-              style={{
-                fontSize: '10px',
-                marginTop: '2px',
-              }}
-            >
-              checkpoints only — not automatic sizing
-            </div>
-          </div>
-
-          <button
-            type="submit"
-          >
-            Generate V2 Base Block
-          </button>
-
-          {message && (
-            <span
-              style={{
-                fontSize:
-                  '13px',
-              }}
-            >
-              {message}
-            </span>
-          )}
         </div>
+
+        <div className="patternInputGroup">
+          <div className="patternInputGroupTitle">
+            Body Measurements
+          </div>
+
+          <label className="patternInputField">
+            <span>
+              Back Length (B)
+            </span>
+
+            <div className="patternInputWithUnit">
+              <input
+                type="number"
+                min="0.1"
+                step="0.1"
+                inputMode="decimal"
+                placeholder="e.g. 22"
+                value={
+                  backLengthInput
+                }
+                onChange={(
+                  event,
+                ) =>
+                  setBackLengthInput(
+                    event.target.value,
+                  )
+                }
+              />
+
+              <span>
+                cm
+              </span>
+            </div>
+          </label>
+
+          <label className="patternInputField">
+            <span>
+              Chest Girth (C)
+            </span>
+
+            <div className="patternInputWithUnit">
+              <input
+                type="number"
+                min="0.1"
+                step="0.1"
+                inputMode="decimal"
+                placeholder="e.g. 36"
+                value={
+                  chestGirthInput
+                }
+                onChange={(
+                  event,
+                ) =>
+                  setChestGirthInput(
+                    event.target.value,
+                  )
+                }
+              />
+
+              <span>
+                cm
+              </span>
+            </div>
+          </label>
+
+          <label className="patternInputField">
+            <span>
+              Neck Girth (N)
+            </span>
+
+            <div className="patternInputWithUnit">
+              <input
+                type="number"
+                min="0.1"
+                step="0.1"
+                inputMode="decimal"
+                placeholder="e.g. 27"
+                value={
+                  neckGirthInput
+                }
+                onChange={(
+                  event,
+                ) =>
+                  setNeckGirthInput(
+                    event.target.value,
+                  )
+                }
+              />
+
+              <span>
+                cm
+              </span>
+            </div>
+          </label>
+        </div>
+
+        <div className="patternInputGroup">
+          <div className="patternInputGroupTitle">
+            Drafting
+          </div>
+
+          <label className="patternInputField">
+            <span>
+              Shoulder Length
+            </span>
+
+            <div className="patternInputWithUnit">
+              <input
+                type="number"
+                min="0.1"
+                step="0.1"
+                inputMode="decimal"
+                placeholder="e.g. 3.0"
+                value={
+                  shoulderLengthInput
+                }
+                onChange={(
+                  event,
+                ) =>
+                  setShoulderLengthInput(
+                    event.target.value,
+                  )
+                }
+              />
+
+              <span>
+                cm
+              </span>
+            </div>
+
+            <small>
+              Explicit — no automatic size assignment
+            </small>
+          </label>
+
+          <label className="patternInputField">
+            <span>
+              Neck Opening +
+            </span>
+
+            <div className="patternInputWithUnit">
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                inputMode="decimal"
+                placeholder="0"
+                value={
+                  neckOpeningAllowanceInput
+                }
+                onChange={(
+                  event,
+                ) =>
+                  setNeckOpeningAllowanceInput(
+                    event.target.value,
+                  )
+                }
+              />
+
+              <span>
+                cm
+              </span>
+            </div>
+
+            <small>
+              Optional amount added to the minimum opening
+            </small>
+          </label>
+        </div>
+
+        <div className="patternInfoCard">
+          <strong>
+            Body allowance
+          </strong>
+
+          <div>
+            Half-body:{' '}
+            {formatAllowanceCm(
+              halfBodyAllowanceMm,
+            )}
+          </div>
+
+          <div>
+            Finished circumference:{' '}
+            {formatAllowanceCm(
+              completedAllowanceMm,
+            )}
+          </div>
+        </div>
+
+        <div className="patternInfoCard">
+          <strong>
+            Shoulder reference
+          </strong>
+
+          <div>
+            S 2.5 · M 3.0 · L 4.0 · XL 4.5 cm
+          </div>
+
+          <div>
+            Construction angle: 45°
+          </div>
+
+          <small>
+            Checkpoints only — not automatic sizing
+          </small>
+        </div>
+
+        <button
+          type="submit"
+          className="patternGenerateButton"
+        >
+          Generate V2 Base Block
+        </button>
+
+        {message && (
+          <div className="patternInputMessage">
+            {message}
+          </div>
+        )}
       </form>
     </section>
   )

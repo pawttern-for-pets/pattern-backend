@@ -2,27 +2,255 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
 .app {
   width: 100vw;
   height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: #eeeeee;
 }
 
 .header {
-  height: 50px;
+  min-height: 50px;
+  flex: 0 0 50px;
   display: flex;
   align-items: center;
   gap: 20px;
   padding: 0 20px;
   background: #ffffff;
   border-bottom: 1px solid #cccccc;
+  overflow: hidden;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.projectStatus {
+  min-width: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.projectStatusUnsaved {
+  font-weight: bold;
+}
+
+.projectMessage {
+  min-width: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.projectMessageError {
+  color: #b00020;
+}
+
+.workspaceShell {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.patternSidebar {
+  width: 280px;
+  flex: 0 0 280px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-right: 1px solid #cccccc;
+  transition:
+    width 160ms ease,
+    flex-basis 160ms ease;
+}
+
+.sidebarCollapsed .patternSidebar {
+  width: 42px;
+  flex-basis: 42px;
+}
+
+.patternSidebarHeader {
+  height: 42px;
+  flex: 0 0 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px 0 14px;
+  border-bottom: 1px solid #dddddd;
+  background: #fafafa;
+}
+
+.sidebarCollapseButton {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.sidebarExpandButton {
+  width: 100%;
+  height: 100%;
+  padding: 10px 0;
+  border: 0;
+  border-radius: 0;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.sidebarExpandButton:hover {
+  background: #f0f0f0;
+}
+
+.sidebarVerticalLabel {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.patternSidebarContent {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.patternInputPanel {
+  padding: 14px;
+  background: #ffffff;
+}
+
+.patternInputForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.patternInputIntro {
+  line-height: 1.35;
+}
+
+.patternInputSubtle {
+  margin-top: 3px;
+  font-size: 11px;
+  color: #666666;
+}
+
+.patternInputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.patternInputGroupTitle {
+  padding-bottom: 5px;
+  border-bottom: 1px solid #e4e4e4;
+  font-size: 11px;
+  font-weight: 700;
+  color: #555555;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.patternInputField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.patternInputField small,
+.patternInfoCard small {
+  color: #666666;
+  line-height: 1.35;
+}
+
+.patternInputWithUnit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: 6px;
+}
+
+.patternInputWithUnit input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+.patternInputWithUnit > span {
+  font-size: 11px;
+  color: #666666;
+}
+
+.patternInfoCard {
+  padding: 9px 10px;
+  border: 1px solid #d7d7d7;
+  border-radius: 5px;
+  background: #fafafa;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.patternInfoCard strong {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.patternGenerateButton {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.patternInputMessage {
+  padding: 8px 9px;
+  border: 1px solid #dddddd;
+  border-radius: 4px;
+  background: #fafafa;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .workspace {
   flex: 1;
-  padding: 20px;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
   overflow: hidden;
 }
 
@@ -31,8 +259,30 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 0 0 auto;
 }
 
 .unitControl select {
   padding: 5px 8px;
+}
+
+@media (max-width: 900px) {
+  .header {
+    gap: 10px;
+    padding: 0 10px;
+  }
+
+  .header > span:not(.projectStatus):not(.projectMessage) {
+    display: none;
+  }
+
+  .patternSidebar {
+    width: 250px;
+    flex-basis: 250px;
+  }
+
+  .sidebarCollapsed .patternSidebar {
+    width: 42px;
+    flex-basis: 42px;
+  }
 }
