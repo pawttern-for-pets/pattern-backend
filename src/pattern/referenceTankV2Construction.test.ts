@@ -123,6 +123,8 @@ describe(
       })
 
     const options = {
+      bellyVariant: 'female' as const,
+
       halfBodyAllowanceMm: 10,
       shoulderLengthMm: 30,
       neckOpeningAllowanceMm: 0,
@@ -452,6 +454,56 @@ describe(
           REFERENCE_TANK_V2_POINT_IDS
             .maleBellyUpperReference,
         )
+      },
+    )
+
+    it(
+      'uses the male default belly endpoint while keeping the upper male point as reference only',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            {
+              ...options,
+              bellyVariant: 'male',
+            },
+          )
+
+        const bellyCurve =
+          result.document.curves[
+            REFERENCE_TANK_V2_CURVE_IDS
+              .bellyEdge
+          ]
+
+        expect(
+          bellyCurve.endPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .maleBellyDefaultEndpoint,
+        )
+
+        expect(
+          bellyCurve.endPointId,
+        ).not.toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .femaleBellyEndpoint,
+        )
+
+        expect(
+          bellyCurve.endPointId,
+        ).not.toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .maleBellyUpperReference,
+        )
+
+        expect(
+          result.document.points[
+            bellyCurve.endPointId
+          ],
+        ).toMatchObject({
+          xMm: 190,
+          yMm: 110,
+        })
       },
     )
 

@@ -80,6 +80,9 @@ describe(
             {
               measurements,
 
+              bellyVariant:
+                'male',
+
               halfBodyAllowanceMm,
 
               shoulderLengthMm,
@@ -105,6 +108,10 @@ describe(
           neckGirthMm:
             270,
         })
+
+        expect(
+          updated.bellyVariant,
+        ).toBe('male')
 
         expect(
           updated.halfBodyAllowanceMm,
@@ -164,6 +171,9 @@ describe(
             {
               measurements,
 
+              bellyVariant:
+                'male',
+
               halfBodyAllowanceMm:
                 15,
 
@@ -211,6 +221,9 @@ describe(
             {
               measurements,
 
+              bellyVariant:
+                'male',
+
               halfBodyAllowanceMm:
                 -1,
 
@@ -237,6 +250,9 @@ describe(
             {
               measurements,
 
+              bellyVariant:
+                'male',
+
               halfBodyAllowanceMm:
                 10,
 
@@ -262,6 +278,9 @@ describe(
             project,
             {
               measurements,
+
+              bellyVariant:
+                'male',
 
               halfBodyAllowanceMm:
                 10,

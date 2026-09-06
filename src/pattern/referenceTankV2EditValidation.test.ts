@@ -48,6 +48,8 @@ function createGeneratedProject(
     createReferenceTankV2Construction(
       measurements,
       {
+        bellyVariant: 'female',
+
         halfBodyAllowanceMm:
           10,
 
@@ -63,6 +65,8 @@ function createGeneratedProject(
       createPatternProject(),
       {
         measurements,
+
+        bellyVariant: 'female',
 
         halfBodyAllowanceMm:
           10,
@@ -833,7 +837,7 @@ describe(
     )
 
     it(
-      'rejects BÃ©zier control edits that make the finished neckline smaller than the active minimum',
+      'rejects BÃƒÆ’Ã‚Â©zier control edits that make the finished neckline smaller than the active minimum',
       () => {
         const project =
           createGeneratedProject(

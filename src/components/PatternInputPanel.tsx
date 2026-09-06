@@ -22,6 +22,10 @@ import {
   createReferenceTankV2Construction,
 } from '../pattern/referenceTankV2Construction'
 
+import type {
+  BellyVariant,
+} from '../pattern/referenceTankV2BellyVariant'
+
 interface PatternInputPanelProps {
   measurements:
     BodyMeasurements | null
@@ -35,6 +39,9 @@ interface PatternInputPanelProps {
   neckOpeningAllowanceMm:
     number
 
+  bellyVariant:
+    BellyVariant
+
   onGenerate: (
     measurements:
       BodyMeasurements,
@@ -47,6 +54,9 @@ interface PatternInputPanelProps {
 
     neckOpeningAllowanceMm:
       number,
+
+    bellyVariant:
+      BellyVariant,
 
     document:
       PatternDocument,
@@ -123,6 +133,7 @@ export function PatternInputPanel({
   halfBodyAllowanceMm,
   shoulderLengthMm,
   neckOpeningAllowanceMm,
+  bellyVariant,
   onGenerate,
 }: PatternInputPanelProps) {
   const [
@@ -284,6 +295,8 @@ export function PatternInputPanel({
           {
             halfBodyAllowanceMm,
 
+            bellyVariant,
+
             shoulderLengthMm,
 
             neckOpeningAllowanceMm:
@@ -296,11 +309,12 @@ export function PatternInputPanel({
         halfBodyAllowanceMm,
         shoulderLengthMm,
         nextNeckOpeningAllowanceMm,
+        bellyVariant,
         construction.document,
       )
 
       setMessage(
-        `V2 block generated · neckline ${formatInputNumber(
+        `V2 block generated ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· neckline ${formatInputNumber(
           mmToCm(
             construction
               .neckline
@@ -337,7 +351,7 @@ export function PatternInputPanel({
           </strong>
 
           <div className="patternInputSubtle">
-            Video Reference 2 · measurements in cm
+            Video Reference 2 ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· measurements in cm
           </div>
         </div>
 
@@ -472,7 +486,7 @@ export function PatternInputPanel({
             </div>
 
             <small>
-              Explicit — no automatic size assignment
+              Explicit ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â no automatic size assignment
             </small>
           </label>
 
@@ -537,15 +551,15 @@ export function PatternInputPanel({
           </strong>
 
           <div>
-            S 2.5 · M 3.0 · L 4.0 · XL 4.5 cm
+            S 2.5 ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· M 3.0 ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· L 4.0 ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· XL 4.5 cm
           </div>
 
           <div>
-            Construction angle: 45°
+            Construction angle: 45ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
           </div>
 
           <small>
-            Checkpoints only — not automatic sizing
+            Checkpoints only ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â not automatic sizing
           </small>
         </div>
 

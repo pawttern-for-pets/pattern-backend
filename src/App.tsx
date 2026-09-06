@@ -50,6 +50,7 @@ import {
 import {
   setPatternProjectDocument,
   setPatternProjectGeneratedBlock,
+  type BellyVariant,
 } from './pattern/project'
 
 import {
@@ -334,6 +335,9 @@ function App() {
     neckOpeningAllowanceMm:
       number,
 
+    bellyVariant:
+      BellyVariant,
+
     document:
       PatternDocument,
   ) => {
@@ -349,6 +353,8 @@ function App() {
             currentPatternProject,
             {
               measurements,
+
+              bellyVariant,
 
               halfBodyAllowanceMm,
 
@@ -795,7 +801,7 @@ function App() {
           }
         >
           {projectStatus}
-          {' — '}
+          {' ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â '}
           {project.fileName}
         </span>
 
@@ -870,7 +876,7 @@ function App() {
               aria-label="Show measurements"
             >
               <span>
-                ▶
+                ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶
               </span>
 
               <span className="sidebarVerticalLabel">
@@ -895,7 +901,7 @@ function App() {
                   title="Hide measurements"
                   aria-label="Hide measurements"
                 >
-                  ◀
+                  ÃƒÂ¢Ã¢â‚¬â€Ã¢â€šÂ¬
                 </button>
               </div>
 
@@ -918,6 +924,9 @@ function App() {
                   neckOpeningAllowanceMm={
                     patternProject
                       .neckOpeningAllowanceMm
+                  }
+                  bellyVariant={
+                    patternProject.bellyVariant
                   }
                   onGenerate={
                     handleGenerateBaseBlock

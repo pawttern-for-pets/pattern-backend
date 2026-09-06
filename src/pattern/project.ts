@@ -8,6 +8,16 @@ import {
   type BodyMeasurements,
 } from './measurements'
 
+import {
+  DEFAULT_BELLY_VARIANT,
+  type BellyVariant,
+} from './referenceTankV2BellyVariant'
+
+export {
+  DEFAULT_BELLY_VARIANT,
+  type BellyVariant,
+} from './referenceTankV2BellyVariant'
+
 export const
   PATTERN_PROJECT_SCHEMA_VERSION =
     4 as const
@@ -30,13 +40,6 @@ export type PatternProjectSchemaVersion =
  */
 export type PatternType =
   'racerback-tank'
-export type BellyVariant =
-  'female' |
-  'male'
-
-export const DEFAULT_BELLY_VARIANT:
-  BellyVariant =
-    'female'
 
 export interface PatternProject {
   projectSchemaVersion:
@@ -79,6 +82,9 @@ export interface PatternProject {
  * generated.
  */
 export interface GeneratedPatternBlock {
+  bellyVariant:
+    BellyVariant
+
   measurements:
     BodyMeasurements
 
@@ -464,6 +470,12 @@ export function setPatternProjectGeneratedBlock(
     setPatternProjectNeckOpeningAllowanceMm(
       nextProject,
       generated.neckOpeningAllowanceMm,
+    )
+
+  nextProject =
+    setPatternProjectBellyVariant(
+      nextProject,
+      generated.bellyVariant,
     )
 
   nextProject =
