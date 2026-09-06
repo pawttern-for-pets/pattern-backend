@@ -837,7 +837,7 @@ describe(
     )
 
     it(
-      'rejects BÃƒÆ’Ã‚Â©zier control edits that make the finished neckline smaller than the active minimum',
+      'rejects Bezier control edits that make the finished neckline smaller than the active minimum',
       () => {
         const project =
           createGeneratedProject(

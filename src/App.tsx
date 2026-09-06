@@ -801,7 +801,7 @@ function App() {
           }
         >
           {projectStatus}
-          {' ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â '}
+          {' \u2014 '}
           {project.fileName}
         </span>
 
@@ -876,7 +876,7 @@ function App() {
               aria-label="Show measurements"
             >
               <span>
-                ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶
+                {'\u25B6'}
               </span>
 
               <span className="sidebarVerticalLabel">
@@ -901,7 +901,7 @@ function App() {
                   title="Hide measurements"
                   aria-label="Hide measurements"
                 >
-                  ÃƒÂ¢Ã¢â‚¬â€Ã¢â€šÂ¬
+                  {'\u25C0'}
                 </button>
               </div>
 
