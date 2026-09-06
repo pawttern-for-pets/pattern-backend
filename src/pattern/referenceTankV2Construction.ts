@@ -33,6 +33,10 @@ import {
   createReferenceTankV2LowerBackGeometry,
 } from './referenceTankV2LowerBackGeometry'
 
+import {
+  createReferenceTankV2BellyGeometry,
+} from './referenceTankV2BellyGeometry'
+
 /*
  * PAWTTERN MASTER BLOCK V2
  *
@@ -204,6 +208,9 @@ export const REFERENCE_TANK_V2_CURVE_IDS = {
 
   lowerBackHemBlend:
     'V2_LOWER_BACK_HEM_BLEND',
+
+  bellyEdge:
+    'V2_BELLY_EDGE',
 } as const
 
 export interface ReferenceTankV2ConstructionOptions
@@ -1001,7 +1008,7 @@ function createNecklineControls(
      * Center-neck leaves horizontally.
      *
      * Side-neck approach:
-     * RIGHT + UP at 45°.
+     * RIGHT + UP at 45ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°.
      */
     backControl1: {
       xMm:
@@ -1031,7 +1038,7 @@ function createNecklineControls(
      * Center-neck leaves horizontally.
      *
      * Side-neck approach:
-     * LEFT + UP at 45°.
+     * LEFT + UP at 45ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°.
      */
     frontControl1: {
       xMm:
@@ -1250,6 +1257,16 @@ export function createReferenceTankV2Construction(
 
       backHemOneThirdPoint:
         formula.backHemOneThirdPoint,
+    })
+
+  /* VIDEO-2 FEMALE BELLY GEOMETRY */
+  const bellyGeometry =
+    createReferenceTankV2BellyGeometry({
+      sideShapingBellyPoint:
+        formula.sideShapingBellyPoint,
+
+      bellyEndpoint:
+        formula.femaleBellyEndpoint,
     })
 
   let document =
@@ -1984,6 +2001,31 @@ export function createReferenceTankV2Construction(
           .finalHemBlendCurve
           .control2,
     })
+  /* FINISHED VIDEO-2 FEMALE BELLY EDGE */
+  document =
+    addCurve(document, {
+      id:
+        REFERENCE_TANK_V2_CURVE_IDS
+          .bellyEdge,
+
+      name:
+        'V2 Belly Edge',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .sideShapingBelly,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .femaleBellyEndpoint,
+
+      control1:
+        bellyGeometry.finishedCurve.control1,
+
+      control2:
+        bellyGeometry.finishedCurve.control2,
+    })
+
 
   /*
    * ARMHOLE QA METRICS
@@ -1991,7 +2033,7 @@ export function createReferenceTankV2Construction(
    * The Master Block armhole is fixed
    * formula-controlled geometry, but we
    * still measure the actual generated
-   * Bézier curves for diagnostics and
+   * BÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©zier curves for diagnostics and
    * later physical-fit validation.
    *
    * Back = Back Shoulder Outer
@@ -2263,7 +2305,7 @@ export function createReferenceTankV2Construction(
           .backShoulder,
 
       name:
-        'V2 Back Shoulder 45°',
+        'V2 Back Shoulder 45ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°',
 
       startPointId:
         REFERENCE_TANK_V2_POINT_IDS
@@ -2335,7 +2377,7 @@ export function createReferenceTankV2Construction(
           .frontShoulder,
 
       name:
-        'V2 Front Shoulder 45°',
+        'V2 Front Shoulder 45ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°',
 
       startPointId:
         REFERENCE_TANK_V2_POINT_IDS

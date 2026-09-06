@@ -94,6 +94,11 @@ const PROTECTED_LOWER_BACK_CURVE_IDS = [
     .lowerBackHemBlend,
 ] as const
 
+const PROTECTED_BELLY_CURVE_IDS = [
+  REFERENCE_TANK_V2_CURVE_IDS
+    .bellyEdge,
+] as const
+
 const PROTECTED_LOWER_BODY_LINE_IDS = [
   REFERENCE_TANK_V2_LINE_IDS
     .lowerBodySideAxis,
@@ -461,6 +466,77 @@ function validateProtectedLowerBackCurves(
 
   return null
 }
+
+function validateProtectedBellyCurves(
+  currentDocument:
+    PatternDocument,
+
+  candidateDocument:
+    PatternDocument,
+): string | null {
+  for (
+    const curveId
+    of PROTECTED_BELLY_CURVE_IDS
+  ) {
+    const currentCurve =
+      currentDocument.curves[
+        curveId
+      ]
+
+    if (!currentCurve) {
+      continue
+    }
+
+    const candidateCurve =
+      candidateDocument.curves[
+        curveId
+      ]
+
+    if (!candidateCurve) {
+      return (
+        `Generated belly curve ${curveId} cannot be deleted. ` +
+        'Regenerate the parametric Master Block instead.'
+      )
+    }
+
+    const endpointsChanged =
+      candidateCurve.startPointId !==
+        currentCurve.startPointId ||
+      candidateCurve.endPointId !==
+        currentCurve.endPointId
+
+    const controlsChanged =
+      !isSameCoordinate(
+        candidateCurve.control1.xMm,
+        currentCurve.control1.xMm,
+      ) ||
+      !isSameCoordinate(
+        candidateCurve.control1.yMm,
+        currentCurve.control1.yMm,
+      ) ||
+      !isSameCoordinate(
+        candidateCurve.control2.xMm,
+        currentCurve.control2.xMm,
+      ) ||
+      !isSameCoordinate(
+        candidateCurve.control2.yMm,
+        currentCurve.control2.yMm,
+      )
+
+    if (
+      endpointsChanged ||
+      controlsChanged
+    ) {
+      return (
+        `Generated belly curve ${curveId} cannot be edited manually. ` +
+        'The V2 Master Block belly edge is controlled by the Video-2 drafting formula.'
+      )
+    }
+  }
+
+  return null
+}
+
 
 function validateCurveTopology(
   curve:
@@ -951,6 +1027,30 @@ export function validateReferenceTankV2DocumentEdit(
 
       message:
         protectedLowerBackCurveError,
+
+      finishedNeckOpeningMm:
+        null,
+
+      minimumNeckOpeningMm,
+    }
+  }
+
+  const protectedBellyCurveError =
+    validateProtectedBellyCurves(
+      project.document,
+      candidateDocument,
+    )
+
+  if (
+    protectedBellyCurveError !==
+    null
+  ) {
+    return {
+      isValid:
+        false,
+
+      message:
+        protectedBellyCurveError,
 
       finishedNeckOpeningMm:
         null,

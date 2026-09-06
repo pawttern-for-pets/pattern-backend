@@ -153,7 +153,7 @@ describe(
           Object.keys(
             result.document.curves,
           ),
-        ).toHaveLength(8)
+        ).toHaveLength(9)
       },
     )
 
@@ -406,48 +406,52 @@ describe(
          * two neckline and four armhole
          * curves.
          *
-         * Belly-edge curves remain
-         * intentionally deferred.
+         * One female belly-edge curve is now
+         * integrated for visual proof.
          */
         expect(
           Object.keys(
             result.document.curves,
           ),
-        ).toHaveLength(8)
+        ).toHaveLength(9)
 
-        const bellyReferenceIds =
-          new Set<string>([
-            REFERENCE_TANK_V2_POINT_IDS
-              .sideShapingBelly,
+        const bellyCurve =
+          result.document.curves[
+            REFERENCE_TANK_V2_CURVE_IDS
+              .bellyEdge
+          ]
 
-            REFERENCE_TANK_V2_POINT_IDS
-              .femaleBellyEndpoint,
+        expect(
+          bellyCurve,
+        ).toBeDefined()
 
-            REFERENCE_TANK_V2_POINT_IDS
-              .maleBellyDefaultEndpoint,
+        expect(
+          bellyCurve.startPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .sideShapingBelly,
+        )
 
-            REFERENCE_TANK_V2_POINT_IDS
-              .maleBellyUpperReference,
-          ])
+        expect(
+          bellyCurve.endPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .femaleBellyEndpoint,
+        )
 
-        for (
-          const curve
-          of Object.values(
-            result.document.curves,
-          )
-        ) {
-          expect(
-            bellyReferenceIds.has(
-              curve.startPointId,
-            ),
-          ).toBe(false)
+        expect(
+          bellyCurve.endPointId,
+        ).not.toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .maleBellyDefaultEndpoint,
+        )
 
-          expect(
-            bellyReferenceIds.has(
-              curve.endPointId,
-            ),
-          ).toBe(false)
-        }
+        expect(
+          bellyCurve.endPointId,
+        ).not.toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .maleBellyUpperReference,
+        )
       },
     )
 

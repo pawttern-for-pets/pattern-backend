@@ -833,7 +833,7 @@ describe(
     )
 
     it(
-      'rejects Bézier control edits that make the finished neckline smaller than the active minimum',
+      'rejects BÃ©zier control edits that make the finished neckline smaller than the active minimum',
       () => {
         const project =
           createGeneratedProject(
@@ -1781,6 +1781,171 @@ describe(
           result.message,
         ).toMatch(
           /lower-back curve.*cannot be edited manually/i,
+        )
+      },
+    )
+
+    it(
+      'rejects deleting the generated belly curve',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const curveId =
+          REFERENCE_TANK_V2_CURVE_IDS
+            .bellyEdge
+
+        const remainingCurves = {
+          ...project.document.curves,
+        }
+
+        delete remainingCurves[
+          curveId
+        ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          curves:
+            remainingCurves,
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /belly curve.*cannot be deleted/i,
+        )
+      },
+    )
+
+    it(
+      'rejects editing either generated belly Bezier control',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const curveId =
+          REFERENCE_TANK_V2_CURVE_IDS
+            .bellyEdge
+
+        const curve =
+          project.document.curves[
+            curveId
+          ]
+
+        for (
+          const controlKey
+          of [
+            'control1',
+            'control2',
+          ] as const
+        ) {
+          const candidateDocument = {
+            ...project.document,
+
+            curves: {
+              ...project.document
+                .curves,
+
+              [curveId]: {
+                ...curve,
+
+                [controlKey]: {
+                  ...curve[
+                    controlKey
+                  ],
+
+                  xMm:
+                    curve[
+                      controlKey
+                    ].xMm +
+                    1,
+                },
+              },
+            },
+          }
+
+          const result =
+            validateReferenceTankV2DocumentEdit(
+              project,
+              candidateDocument,
+            )
+
+          expect(
+            result.isValid,
+          ).toBe(false)
+
+          expect(
+            result.message,
+          ).toMatch(
+            /belly curve.*cannot be edited manually/i,
+          )
+        }
+      },
+    )
+
+    it(
+      'rejects reassigning the generated belly curve endpoint',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const curveId =
+          REFERENCE_TANK_V2_CURVE_IDS
+            .bellyEdge
+
+        const curve =
+          project.document.curves[
+            curveId
+          ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          curves: {
+            ...project.document
+              .curves,
+
+            [curveId]: {
+              ...curve,
+
+              endPointId:
+                REFERENCE_TANK_V2_POINT_IDS
+                  .maleBellyDefaultEndpoint,
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(
+          result.isValid,
+        ).toBe(false)
+
+        expect(
+          result.message,
+        ).toMatch(
+          /belly curve.*cannot be edited manually/i,
         )
       },
     )
