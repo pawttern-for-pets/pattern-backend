@@ -15,10 +15,12 @@ import {
 import {
   clearPatternProjectMeasurements,
   createPatternProject,
+  DEFAULT_BELLY_VARIANT,
   DEFAULT_HALF_BODY_ALLOWANCE_MM,
   DEFAULT_NECK_OPENING_ALLOWANCE_MM,
   PATTERN_PROJECT_SCHEMA_VERSION,
   setDraftingRuleVersion,
+  setPatternProjectBellyVariant,
   setPatternProjectDocument,
   setPatternProjectHalfBodyAllowanceMm,
   setPatternProjectHeadGirthMm,
@@ -31,7 +33,7 @@ describe(
   'PAWTTERN PatternProject',
   () => {
     it(
-      'creates version 3 of the project container',
+      'creates version 4 of the project container',
       () => {
         const project =
           createPatternProject()
@@ -44,7 +46,7 @@ describe(
 
         expect(
           project.projectSchemaVersion,
-        ).toBe(3)
+        ).toBe(4)
       },
     )
 
@@ -80,6 +82,42 @@ describe(
       },
     )
 
+    it(
+      'defaults the belly variant to female',
+      () => {
+        const project =
+          createPatternProject()
+
+        expect(
+          project.bellyVariant,
+        ).toBe(
+          DEFAULT_BELLY_VARIANT,
+        )
+
+        expect(
+          project.bellyVariant,
+        ).toBe(
+          'female',
+        )
+      },
+    )
+
+    it(
+      'stores an explicit male belly variant',
+      () => {
+        const project =
+          setPatternProjectBellyVariant(
+            createPatternProject(),
+            'male',
+          )
+
+        expect(
+          project.bellyVariant,
+        ).toBe(
+          'male',
+        )
+      },
+    )
     it(
       'does not invent a shoulder length for a new project',
       () => {

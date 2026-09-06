@@ -21,6 +21,7 @@ import {
   createPatternProject,
   setDraftingRuleVersion,
   setPatternProjectDocument,
+  setPatternProjectBellyVariant,
   setPatternProjectHalfBodyAllowanceMm,
   setPatternProjectHeadGirthMm,
   setPatternProjectMeasurements,
@@ -37,7 +38,7 @@ describe(
   'PAWTTERN PatternProject serialization',
   () => {
     it(
-      'saves Schema-3 drafting parameters measurements and CAD geometry together',
+      'saves Schema-4 drafting parameters measurements belly variant and CAD geometry together',
       () => {
         const measurements =
           createBodyMeasurementsFromCm({
@@ -77,6 +78,11 @@ describe(
           )
 
         project =
+          setPatternProjectBellyVariant(
+            project,
+            'male',
+          )
+        project =
           setDraftingRuleVersion(
             project,
             'PAWTTERN_MASTER_V2',
@@ -111,7 +117,7 @@ describe(
 
         expect(
           opened.projectSchemaVersion,
-        ).toBe(3)
+        ).toBe(4)
 
         expect(
           opened.measurements,
@@ -138,6 +144,11 @@ describe(
         ).toBe(320)
 
         expect(
+          opened.bellyVariant,
+        ).toBe(
+          'male',
+        )
+        expect(
           opened.draftingRuleVersion,
         ).toBe(
           'PAWTTERN_MASTER_V2',
@@ -149,6 +160,81 @@ describe(
       },
     )
 
+    it(
+      'migrates a version 3 project while defaulting the historical belly variant to female',
+      () => {
+        const measurements =
+          createBodyMeasurementsFromCm({
+            backLengthCm: 22,
+            chestGirthCm: 36,
+            neckGirthCm: 27,
+          })
+
+        const legacyProject = {
+          projectSchemaVersion: 3,
+          patternType:
+            'racerback-tank',
+          draftingRuleVersion:
+            'PAWTTERN_MASTER_V2',
+          measurements,
+          halfBodyAllowanceMm:
+            10,
+          shoulderLengthMm:
+            30,
+          neckOpeningAllowanceMm:
+            15,
+          headGirthMm:
+            320,
+          document:
+            createEmptyDocument(),
+        }
+
+        const opened =
+          deserializePatternProject(
+            JSON.stringify(
+              legacyProject,
+            ),
+          )
+
+        expect(
+          opened.projectSchemaVersion,
+        ).toBe(4)
+
+        expect(
+          opened.measurements,
+        ).toEqual(
+          measurements,
+        )
+
+        expect(
+          opened.halfBodyAllowanceMm,
+        ).toBe(10)
+
+        expect(
+          opened.shoulderLengthMm,
+        ).toBe(30)
+
+        expect(
+          opened.neckOpeningAllowanceMm,
+        ).toBe(15)
+
+        expect(
+          opened.headGirthMm,
+        ).toBe(320)
+
+        expect(
+          opened.draftingRuleVersion,
+        ).toBe(
+          'PAWTTERN_MASTER_V2',
+        )
+
+        expect(
+          opened.bellyVariant,
+        ).toBe(
+          'female',
+        )
+      },
+    )
     it(
       'migrates a version 2 project while preserving historical data',
       () => {
@@ -181,7 +267,7 @@ describe(
 
         expect(
           opened.projectSchemaVersion,
-        ).toBe(3)
+        ).toBe(4)
 
         expect(
           opened.halfBodyAllowanceMm,
@@ -210,6 +296,11 @@ describe(
         expect(
           opened.headGirthMm,
         ).toBeNull()
+        expect(
+          opened.bellyVariant,
+        ).toBe(
+          'female',
+        )
       },
     )
 
@@ -243,7 +334,7 @@ describe(
 
         expect(
           opened.projectSchemaVersion,
-        ).toBe(3)
+        ).toBe(4)
 
         expect(
           opened.halfBodyAllowanceMm,
@@ -266,6 +357,11 @@ describe(
         expect(
           opened.headGirthMm,
         ).toBeNull()
+        expect(
+          opened.bellyVariant,
+        ).toBe(
+          'female',
+        )
       },
     )
 
@@ -295,7 +391,7 @@ describe(
 
         expect(
           opened.projectSchemaVersion,
-        ).toBe(3)
+        ).toBe(4)
 
         expect(
           opened.measurements,
@@ -316,6 +412,11 @@ describe(
         expect(
           opened.headGirthMm,
         ).toBeNull()
+        expect(
+          opened.bellyVariant,
+        ).toBe(
+          'female',
+        )
 
         expect(
           opened.document,
@@ -326,7 +427,7 @@ describe(
     )
 
     it(
-      'rejects invalid Schema-3 negative allowances',
+      'rejects invalid Schema-4 negative allowances',
       () => {
         const invalidProject = {
           ...createPatternProject(),
@@ -338,6 +439,39 @@ describe(
         expect(() =>
           serializePatternProject(
             invalidProject,
+          ),
+        ).toThrow()
+      },
+    )
+
+    it(
+      'rejects missing or invalid Schema-4 belly variants',
+      () => {
+        const missingBellyVariant = {
+          ...createPatternProject(),
+        } as Record<string, unknown>
+
+        delete missingBellyVariant.bellyVariant
+
+        expect(() =>
+          deserializePatternProject(
+            JSON.stringify(
+              missingBellyVariant,
+            ),
+          ),
+        ).toThrow()
+
+        const invalidBellyVariant = {
+          ...createPatternProject(),
+          bellyVariant:
+            'other',
+        }
+
+        expect(() =>
+          deserializePatternProject(
+            JSON.stringify(
+              invalidBellyVariant,
+            ),
           ),
         ).toThrow()
       },

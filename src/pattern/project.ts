@@ -10,7 +10,7 @@ import {
 
 export const
   PATTERN_PROJECT_SCHEMA_VERSION =
-    3 as const
+    4 as const
 
 export const
   DEFAULT_HALF_BODY_ALLOWANCE_MM =
@@ -30,6 +30,13 @@ export type PatternProjectSchemaVersion =
  */
 export type PatternType =
   'racerback-tank'
+export type BellyVariant =
+  'female' |
+  'male'
+
+export const DEFAULT_BELLY_VARIANT:
+  BellyVariant =
+    'female'
 
 export interface PatternProject {
   projectSchemaVersion:
@@ -38,6 +45,8 @@ export interface PatternProject {
   patternType:
     PatternType
 
+  bellyVariant:
+    BellyVariant
   draftingRuleVersion:
     string | null
 
@@ -123,6 +132,8 @@ PatternProject {
     patternType:
       'racerback-tank',
 
+    bellyVariant:
+      DEFAULT_BELLY_VARIANT,
     draftingRuleVersion:
       null,
 
@@ -146,6 +157,37 @@ PatternProject {
   }
 }
 
+export function setPatternProjectBellyVariant(
+  project:
+    PatternProject,
+
+  bellyVariant:
+    BellyVariant,
+): PatternProject {
+  if (
+    bellyVariant !==
+      'female' &&
+    bellyVariant !==
+      'male'
+  ) {
+    throw new Error(
+      'Belly variant must be female or male.',
+    )
+  }
+
+  if (
+    project.bellyVariant ===
+    bellyVariant
+  ) {
+    return project
+  }
+
+  return {
+    ...project,
+
+    bellyVariant,
+  }
+}
 export function setPatternProjectMeasurements(
   project:
     PatternProject,

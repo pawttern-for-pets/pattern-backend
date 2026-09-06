@@ -13,6 +13,9 @@ import {
   setDraftingRuleVersion,
   setPatternProjectDocument,
   setPatternProjectHalfBodyAllowanceMm,
+  setPatternProjectHeadGirthMm,
+  setPatternProjectNeckOpeningAllowanceMm,
+  setPatternProjectShoulderLengthMm,
   setPatternProjectMeasurements,
   type PatternProject,
 } from './project'
@@ -69,9 +72,16 @@ function isValidDraftingRuleVersion(
   )
 }
 
+function isValidBellyVariant(value: unknown): value is PatternProject['bellyVariant'] {
+  return (
+    value === 'female' ||
+    value === 'male'
+  )
+}
+
 /*
  * --------------------------------
- * CURRENT PROJECT — SCHEMA 3
+ * CURRENT PROJECT - SCHEMA 4
  * --------------------------------
  */
 
@@ -85,6 +95,85 @@ export function isValidPatternProject(
   if (
     value.projectSchemaVersion !==
       PATTERN_PROJECT_SCHEMA_VERSION ||
+    value.patternType !==
+      'racerback-tank' ||
+    !isValidBellyVariant(
+      value.bellyVariant,
+    ) ||
+    !isValidDraftingRuleVersion(
+      value.draftingRuleVersion,
+    ) ||
+    !isValidNonNegativeNumber(
+      value.halfBodyAllowanceMm,
+    ) ||
+    !isValidOptionalPositiveNumber(
+      value.shoulderLengthMm,
+    ) ||
+    !isValidNonNegativeNumber(
+      value.neckOpeningAllowanceMm,
+    ) ||
+    !isValidOptionalPositiveNumber(
+      value.headGirthMm,
+    )
+  ) {
+    return false
+  }
+
+  if (
+    value.measurements !== null &&
+    !isValidBodyMeasurements(
+      value.measurements,
+    )
+  ) {
+    return false
+  }
+
+  return isValidPatternDocument(
+    value.document,
+  )
+}
+
+/*
+ * --------------------------------
+ * LEGACY SCHEMA 3
+ * --------------------------------
+ *
+ * Schema 3 already contained:
+ *
+ * measurements
+ * halfBodyAllowanceMm
+ * shoulderLengthMm
+ * neckOpeningAllowanceMm
+ * headGirthMm
+ * draftingRuleVersion
+ * document
+ *
+ * It did NOT contain:
+ *
+ * bellyVariant
+ */
+
+interface LegacyPatternProjectV3 {
+  projectSchemaVersion: 3
+  patternType: 'racerback-tank'
+  draftingRuleVersion: string | null
+  measurements: BodyMeasurements | null
+  halfBodyAllowanceMm: number
+  shoulderLengthMm: number | null
+  neckOpeningAllowanceMm: number
+  headGirthMm: number | null
+  document: PatternProject['document']
+}
+
+function isValidLegacyPatternProjectV3(
+  value: unknown,
+): value is LegacyPatternProjectV3 {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  if (
+    value.projectSchemaVersion !== 3 ||
     value.patternType !==
       'racerback-tank' ||
     !isValidDraftingRuleVersion(
@@ -120,6 +209,70 @@ export function isValidPatternProject(
   )
 }
 
+function migrateLegacyProjectV3(
+  legacy:
+    LegacyPatternProjectV3,
+): PatternProject {
+  let project =
+    createPatternProject()
+
+  project =
+    setPatternProjectHalfBodyAllowanceMm(
+      project,
+      legacy.halfBodyAllowanceMm,
+    )
+
+  project =
+    setPatternProjectShoulderLengthMm(
+      project,
+      legacy.shoulderLengthMm,
+    )
+
+  project =
+    setPatternProjectNeckOpeningAllowanceMm(
+      project,
+      legacy.neckOpeningAllowanceMm,
+    )
+
+  project =
+    setPatternProjectHeadGirthMm(
+      project,
+      legacy.headGirthMm,
+    )
+
+  if (
+    legacy.measurements !== null
+  ) {
+    project =
+      setPatternProjectMeasurements(
+        project,
+        legacy.measurements,
+      )
+  }
+
+  project =
+    setDraftingRuleVersion(
+      project,
+      legacy.draftingRuleVersion,
+    )
+
+  project =
+    setPatternProjectDocument(
+      project,
+      legacy.document,
+    )
+
+  /*
+   * Schema 3 had no belly variant.
+   *
+   * createPatternProject() deliberately
+   * supplies the safe historical default:
+   *
+   * bellyVariant = 'female'
+   */
+
+  return project
+}
 /*
  * --------------------------------
  * LEGACY SCHEMA 2
@@ -364,7 +517,7 @@ export function deserializePatternProject(
   }
 
   /*
-   * Current Schema 3.
+   * Current Schema 4.
    */
   if (
     isValidPatternProject(
@@ -375,7 +528,19 @@ export function deserializePatternProject(
   }
 
   /*
-   * Schema 2 → Schema 3.
+   * Schema 3 -> Schema 4.
+   */
+  if (
+    isValidLegacyPatternProjectV3(
+      parsed,
+    )
+  ) {
+    return migrateLegacyProjectV3(
+      parsed,
+    )
+  }
+  /*
+   * Schema 2 -> Schema 4.
    */
   if (
     isValidLegacyPatternProjectV2(
@@ -388,7 +553,7 @@ export function deserializePatternProject(
   }
 
   /*
-   * Schema 1 → Schema 3.
+   * Schema 1 -> Schema 4.
    */
   if (
     isValidLegacyPatternProjectV1(
