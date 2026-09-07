@@ -108,6 +108,15 @@ const PROTECTED_LOWER_BODY_LINE_IDS = [
 
   REFERENCE_TANK_V2_LINE_IDS
     .backHemCenterToOneThird,
+
+  REFERENCE_TANK_V2_LINE_IDS
+    .frontCenterBodyEdge,
+
+  REFERENCE_TANK_V2_LINE_IDS
+    .backSideSeam,
+
+  REFERENCE_TANK_V2_LINE_IDS
+    .frontBellySideSeam,
 ] as const
 
 export interface ReferenceTankV2EditValidationResult {

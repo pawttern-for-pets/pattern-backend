@@ -169,6 +169,9 @@ export const REFERENCE_TANK_V2_LINE_IDS = {
   frontCenterNeckExtension:
     'V2_FRONT_CENTER_NECK_EXTENSION',
 
+  frontCenterBodyEdge:
+    'V2_FRONT_CENTER_BODY_EDGE',
+
   frontNeckWidthGuide:
     'V2_FRONT_NECK_WIDTH_GUIDE',
 
@@ -183,6 +186,12 @@ export const REFERENCE_TANK_V2_LINE_IDS = {
 
   sideShapingWidth:
     'V2_SIDE_SHAPING_WIDTH',
+
+  backSideSeam:
+    'V2_BACK_SIDE_SEAM',
+
+  frontBellySideSeam:
+    'V2_FRONT_BELLY_SIDE_SEAM',
 
   backHemCenterToOneThird:
     'V2_BACK_HEM_CENTER_TO_ONE_THIRD',
@@ -2212,6 +2221,49 @@ export function createReferenceTankV2Construction(
           .sideShapingBelly,
     })
 
+  /*
+   * FINISHED SIDE-SEAM BOUNDARIES
+   *
+   * The 20 mm shaping section between
+   * these seams is removed from the
+   * finished Back and Front/Belly pieces.
+   */
+  document =
+    addLine(document, {
+      id:
+        REFERENCE_TANK_V2_LINE_IDS
+          .backSideSeam,
+
+      name:
+        'V2 Back Side Seam',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .commonArmpit,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .sideShapingBack,
+    })
+
+  document =
+    addLine(document, {
+      id:
+        REFERENCE_TANK_V2_LINE_IDS
+          .frontBellySideSeam,
+
+      name:
+        'V2 Front/Belly Side Seam',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .commonArmpit,
+
+      endPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .sideShapingBelly,
+    })
+
   document =
     addLine(document, {
       id:
@@ -2349,6 +2401,23 @@ export function createReferenceTankV2Construction(
       endPointId:
         REFERENCE_TANK_V2_POINT_IDS
           .frontArmholeLevel,
+    })
+
+  document =
+    addLine(document, {
+      id:
+        REFERENCE_TANK_V2_LINE_IDS
+          .frontCenterBodyEdge,
+
+      name:
+        'V2 Front Center Body Edge',
+
+      startPointId:
+        REFERENCE_TANK_V2_POINT_IDS
+          .frontArmholeLevel,
+
+      endPointId:
+        bellyEndpointId,
     })
 
   document =

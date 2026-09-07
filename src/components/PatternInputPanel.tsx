@@ -162,6 +162,13 @@ export function PatternInputPanel({
   ] = useState('0')
 
   const [
+    bellyVariantInput,
+    setBellyVariantInput,
+  ] = useState<BellyVariant>(
+    bellyVariant,
+  )
+
+  const [
     message,
     setMessage,
   ] = useState<string | null>(
@@ -232,11 +239,16 @@ export function PatternInputPanel({
       ),
     )
 
+    setBellyVariantInput(
+      bellyVariant,
+    )
+
     setMessage(null)
   }, [
     measurements,
     shoulderLengthMm,
     neckOpeningAllowanceMm,
+    bellyVariant,
   ])
 
   const handleSubmit = (
@@ -295,7 +307,7 @@ export function PatternInputPanel({
           {
             halfBodyAllowanceMm,
 
-            bellyVariant,
+            bellyVariant: bellyVariantInput,
 
             shoulderLengthMm,
 
@@ -309,7 +321,7 @@ export function PatternInputPanel({
         halfBodyAllowanceMm,
         shoulderLengthMm,
         nextNeckOpeningAllowanceMm,
-        bellyVariant,
+        bellyVariantInput,
         construction.document,
       )
 
@@ -455,6 +467,33 @@ export function PatternInputPanel({
           <div className="patternInputGroupTitle">
             Drafting
           </div>
+
+          <label className="patternInputField">
+            <span>
+              Belly Cut
+            </span>
+
+            <select
+              value={bellyVariantInput}
+              onChange={(event) =>
+                setBellyVariantInput(
+                  event.target.value as BellyVariant,
+                )
+              }
+            >
+              <option value="female">
+                Female - longer belly coverage
+              </option>
+
+              <option value="male">
+                Male - shorter belly clearance
+              </option>
+            </select>
+
+            <small>
+              Applied when you generate the pattern
+            </small>
+          </label>
 
           <label className="patternInputField">
             <span>

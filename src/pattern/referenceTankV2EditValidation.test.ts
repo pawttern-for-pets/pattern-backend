@@ -1605,8 +1605,7 @@ describe(
           ...project.document,
 
           lines: {
-            ...project.document
-              .lines,
+            ...project.document.lines,
 
             [lineId]: {
               ...line,
@@ -1624,6 +1623,54 @@ describe(
             candidateDocument,
           )
 
+        expect(result.isValid).toBe(false)
+
+        expect(result.message).toMatch(
+          /lower-body line.*cannot be edited manually/i,
+        )
+      },
+    )
+
+    it(
+      'rejects reassigning the generated front-center body edge endpoint',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const lineId =
+          REFERENCE_TANK_V2_LINE_IDS
+            .frontCenterBodyEdge
+
+        const line =
+          project.document.lines[
+            lineId
+          ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          lines: {
+            ...project.document
+              .lines,
+
+            [lineId]: {
+              ...line,
+
+              endPointId:
+                REFERENCE_TANK_V2_POINT_IDS
+                  .maleBellyDefaultEndpoint,
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
         expect(
           result.isValid,
         ).toBe(false)
@@ -1631,6 +1678,94 @@ describe(
         expect(
           result.message,
         ).toMatch(
+          /lower-body line.*cannot be edited manually/i,
+        )
+      },
+    )
+
+    it(
+      'rejects deleting the generated Back side seam',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const lineId =
+          REFERENCE_TANK_V2_LINE_IDS
+            .backSideSeam
+
+        const remainingLines = {
+          ...project.document.lines,
+        }
+
+        delete remainingLines[
+          lineId
+        ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          lines:
+            remainingLines,
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(result.isValid).toBe(false)
+
+        expect(result.message).toMatch(
+          /lower-body line.*cannot be deleted/i,
+        )
+      },
+    )
+
+    it(
+      'rejects reassigning the generated Front/Belly side seam endpoint',
+      () => {
+        const project =
+          createGeneratedProject(
+            0,
+          )
+
+        const lineId =
+          REFERENCE_TANK_V2_LINE_IDS
+            .frontBellySideSeam
+
+        const line =
+          project.document.lines[
+            lineId
+          ]
+
+        const candidateDocument = {
+          ...project.document,
+
+          lines: {
+            ...project.document.lines,
+
+            [lineId]: {
+              ...line,
+
+              endPointId:
+                REFERENCE_TANK_V2_POINT_IDS
+                  .maleBellyDefaultEndpoint,
+            },
+          },
+        }
+
+        const result =
+          validateReferenceTankV2DocumentEdit(
+            project,
+            candidateDocument,
+          )
+
+        expect(result.isValid).toBe(false)
+
+        expect(result.message).toMatch(
           /lower-body line.*cannot be edited manually/i,
         )
       },

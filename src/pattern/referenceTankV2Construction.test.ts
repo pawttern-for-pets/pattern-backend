@@ -149,7 +149,7 @@ describe(
           Object.keys(
             result.document.lines,
           ),
-        ).toHaveLength(12)
+        ).toHaveLength(15)
 
         expect(
           Object.keys(
@@ -271,6 +271,52 @@ describe(
           ),
         ).toBeCloseTo(
           20,
+          8,
+        )
+      },
+    )
+
+    it(
+      'creates matching finished Back and Front/Belly side seams around the removed shaping wedge',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const backSideSeam =
+          result.document.lines[
+            REFERENCE_TANK_V2_LINE_IDS
+              .backSideSeam
+          ]
+
+        const frontBellySideSeam =
+          result.document.lines[
+            REFERENCE_TANK_V2_LINE_IDS
+              .frontBellySideSeam
+          ]
+
+        expect(backSideSeam.startPointId).toBe(
+          REFERENCE_TANK_V2_POINT_IDS.commonArmpit,
+        )
+
+        expect(backSideSeam.endPointId).toBe(
+          REFERENCE_TANK_V2_POINT_IDS.sideShapingBack,
+        )
+
+        expect(frontBellySideSeam.startPointId).toBe(
+          REFERENCE_TANK_V2_POINT_IDS.commonArmpit,
+        )
+
+        expect(frontBellySideSeam.endPointId).toBe(
+          REFERENCE_TANK_V2_POINT_IDS.sideShapingBelly,
+        )
+
+        expect(
+          lineLengthMm(backSideSeam,result.document.points),
+        ).toBeCloseTo(
+          lineLengthMm(frontBellySideSeam,result.document.points),
           8,
         )
       },
@@ -504,6 +550,33 @@ describe(
           xMm: 190,
           yMm: 110,
         })
+
+        const frontCenterBodyLine =
+          result.document.lines[
+            REFERENCE_TANK_V2_LINE_IDS
+              .frontCenterBodyEdge
+          ]
+
+        expect(
+          frontCenterBodyLine.startPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .frontArmholeLevel,
+        )
+
+        expect(
+          frontCenterBodyLine.endPointId,
+        ).toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .maleBellyDefaultEndpoint,
+        )
+
+        expect(
+          frontCenterBodyLine.endPointId,
+        ).not.toBe(
+          REFERENCE_TANK_V2_POINT_IDS
+            .maleBellyUpperReference,
+        )
       },
     )
 
