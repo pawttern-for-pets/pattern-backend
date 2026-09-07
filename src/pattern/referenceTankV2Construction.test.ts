@@ -160,6 +160,76 @@ describe(
     )
 
     it(
+      'classifies every generated V2 line and curve for pattern topology',
+      () => {
+        const result =
+          createReferenceTankV2Construction(
+            measurements,
+            options,
+          )
+
+        const geometry = [
+          ...Object.values(
+            result.document.lines,
+          ),
+          ...Object.values(
+            result.document.curves,
+          ),
+        ]
+
+        expect(geometry).toHaveLength(24)
+
+        expect(
+          geometry.filter(
+            (entity) =>
+              entity.role === 'boundary',
+          ),
+        ).toHaveLength(17)
+
+        expect(
+          geometry.filter(
+            (entity) =>
+              entity.role === 'construction',
+          ),
+        ).toHaveLength(7)
+
+        expect(
+          geometry.filter(
+            (entity) =>
+              entity.role === undefined,
+          ),
+        ).toHaveLength(0)
+
+        expect(
+          result.document.lines[
+            REFERENCE_TANK_V2_LINE_IDS
+              .sideShapingWidth
+          ].role,
+        ).toBe('construction')
+
+        expect(
+          result.document.lines[
+            REFERENCE_TANK_V2_LINE_IDS
+              .backSideSeam
+          ].role,
+        ).toBe('boundary')
+
+        expect(
+          result.document.lines[
+            REFERENCE_TANK_V2_LINE_IDS
+              .frontBellySideSeam
+          ].role,
+        ).toBe('boundary')
+
+        expect(
+          result.document.curves[
+            REFERENCE_TANK_V2_CURVE_IDS
+              .bellyEdge
+          ].role,
+        ).toBe('boundary')
+      },
+    )
+    it(
       'places the 2/5, 3/5, and 4/5 Back-Length references on the Common Armpit vertical axis',
       () => {
         const result =

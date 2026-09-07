@@ -20,6 +20,10 @@ import type {
 } from '../cad/coordinates'
 
 import type {
+  GeometryRole,
+} from '../cad/geometryRole'
+
+import type {
   BodyMeasurements,
 } from './measurements'
 
@@ -225,6 +229,90 @@ export const REFERENCE_TANK_V2_CURVE_IDS = {
   bellyEdge:
     'V2_BELLY_EDGE',
 } as const
+
+type ReferenceTankV2LineId =
+  (typeof REFERENCE_TANK_V2_LINE_IDS)[
+    keyof typeof REFERENCE_TANK_V2_LINE_IDS
+  ]
+
+type ReferenceTankV2CurveId =
+  (typeof REFERENCE_TANK_V2_CURVE_IDS)[
+    keyof typeof REFERENCE_TANK_V2_CURVE_IDS
+  ]
+
+const REFERENCE_TANK_V2_LINE_ROLES:
+  Record<ReferenceTankV2LineId, GeometryRole> = {
+    [REFERENCE_TANK_V2_LINE_IDS.backCenterLength]: 'boundary',
+    [REFERENCE_TANK_V2_LINE_IDS.armholeDepth]: 'construction',
+    [REFERENCE_TANK_V2_LINE_IDS.backNeckWidthGuide]: 'construction',
+    [REFERENCE_TANK_V2_LINE_IDS.backNeckRiseGuide]: 'construction',
+    [REFERENCE_TANK_V2_LINE_IDS.backShoulder]: 'boundary',
+    [REFERENCE_TANK_V2_LINE_IDS.frontCenterNeckExtension]: 'boundary',
+    [REFERENCE_TANK_V2_LINE_IDS.frontCenterBodyEdge]: 'boundary',
+    [REFERENCE_TANK_V2_LINE_IDS.frontNeckWidthGuide]: 'construction',
+    [REFERENCE_TANK_V2_LINE_IDS.frontNeckRiseGuide]: 'construction',
+    [REFERENCE_TANK_V2_LINE_IDS.frontShoulder]: 'boundary',
+    [REFERENCE_TANK_V2_LINE_IDS.lowerBodySideAxis]: 'construction',
+    [REFERENCE_TANK_V2_LINE_IDS.sideShapingWidth]: 'construction',
+    [REFERENCE_TANK_V2_LINE_IDS.backSideSeam]: 'boundary',
+    [REFERENCE_TANK_V2_LINE_IDS.frontBellySideSeam]: 'boundary',
+    [REFERENCE_TANK_V2_LINE_IDS.backHemCenterToOneThird]: 'boundary',
+  }
+
+const REFERENCE_TANK_V2_CURVE_ROLES:
+  Record<ReferenceTankV2CurveId, GeometryRole> = {
+    [REFERENCE_TANK_V2_CURVE_IDS.backNeckline]: 'boundary',
+    [REFERENCE_TANK_V2_CURVE_IDS.frontNeckline]: 'boundary',
+    [REFERENCE_TANK_V2_CURVE_IDS.backArmholeShoulderToPivot]: 'boundary',
+    [REFERENCE_TANK_V2_CURVE_IDS.backArmholePivotToCommon]: 'boundary',
+    [REFERENCE_TANK_V2_CURVE_IDS.frontArmholeCommonToPivot]: 'boundary',
+    [REFERENCE_TANK_V2_CURVE_IDS.frontArmholePivotToShoulder]: 'boundary',
+    [REFERENCE_TANK_V2_CURVE_IDS.lowerBackUpper]: 'boundary',
+    [REFERENCE_TANK_V2_CURVE_IDS.lowerBackHemBlend]: 'boundary',
+    [REFERENCE_TANK_V2_CURVE_IDS.bellyEdge]: 'boundary',
+  }
+
+function addReferenceTankV2Line(
+  document: PatternDocument,
+  line: Omit<Parameters<typeof addLine>[1], 'role'>,
+): PatternDocument {
+  const role =
+    REFERENCE_TANK_V2_LINE_ROLES[
+      line.id as ReferenceTankV2LineId
+    ]
+
+  if (!role) {
+    throw new Error(
+      'Missing V2 line role for ' + line.id + '.',
+    )
+  }
+
+  return addLine(document, {
+    ...line,
+    role,
+  })
+}
+
+function addReferenceTankV2Curve(
+  document: PatternDocument,
+  curve: Omit<Parameters<typeof addCurve>[1], 'role'>,
+): PatternDocument {
+  const role =
+    REFERENCE_TANK_V2_CURVE_ROLES[
+      curve.id as ReferenceTankV2CurveId
+    ]
+
+  if (!role) {
+    throw new Error(
+      'Missing V2 curve role for ' + curve.id + '.',
+    )
+  }
+
+  return addCurve(document, {
+    ...curve,
+    role,
+  })
+}
 
 export interface ReferenceTankV2ConstructionOptions
   extends ReferenceTankV2FormulaOptions {
@@ -1791,7 +1879,7 @@ export function createReferenceTankV2Construction(
    */
 
   document =
-    addCurve(document, {
+    addReferenceTankV2Curve(document, {
       id:
         REFERENCE_TANK_V2_CURVE_IDS
           .backNeckline,
@@ -1815,7 +1903,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addCurve(document, {
+    addReferenceTankV2Curve(document, {
       id:
         REFERENCE_TANK_V2_CURVE_IDS
           .frontNeckline,
@@ -1859,7 +1947,7 @@ export function createReferenceTankV2Construction(
     armholeSplineSegments
 
   document =
-    addCurve(document, {
+    addReferenceTankV2Curve(document, {
       id:
         REFERENCE_TANK_V2_CURVE_IDS
           .backArmholeShoulderToPivot,
@@ -1883,7 +1971,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addCurve(document, {
+    addReferenceTankV2Curve(document, {
       id:
         REFERENCE_TANK_V2_CURVE_IDS
           .backArmholePivotToCommon,
@@ -1907,7 +1995,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addCurve(document, {
+    addReferenceTankV2Curve(document, {
       id:
         REFERENCE_TANK_V2_CURVE_IDS
           .frontArmholeCommonToPivot,
@@ -1931,7 +2019,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addCurve(document, {
+    addReferenceTankV2Curve(document, {
       id:
         REFERENCE_TANK_V2_CURVE_IDS
           .frontArmholePivotToShoulder,
@@ -1974,7 +2062,7 @@ export function createReferenceTankV2Construction(
    * lower-back edge.
    */
   document =
-    addCurve(document, {
+    addReferenceTankV2Curve(document, {
       id:
         REFERENCE_TANK_V2_CURVE_IDS
           .lowerBackUpper,
@@ -2002,7 +2090,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addCurve(document, {
+    addReferenceTankV2Curve(document, {
       id:
         REFERENCE_TANK_V2_CURVE_IDS
           .lowerBackHemBlend,
@@ -2030,7 +2118,7 @@ export function createReferenceTankV2Construction(
     })
   /* FINISHED VIDEO-2 FEMALE BELLY EDGE */
   document =
-    addCurve(document, {
+    addReferenceTankV2Curve(document, {
       id:
         REFERENCE_TANK_V2_CURVE_IDS
           .bellyEdge,
@@ -2186,7 +2274,7 @@ export function createReferenceTankV2Construction(
    * lines so the workspace stays clear.
    */
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .lowerBodySideAxis,
@@ -2204,7 +2292,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .sideShapingWidth,
@@ -2229,7 +2317,7 @@ export function createReferenceTankV2Construction(
    * finished Back and Front/Belly pieces.
    */
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .backSideSeam,
@@ -2247,7 +2335,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .frontBellySideSeam,
@@ -2265,7 +2353,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .backCenterLength,
@@ -2296,7 +2384,7 @@ export function createReferenceTankV2Construction(
    * Back Hem 2/3 remains construction-only.
    */
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .backHemCenterToOneThird,
@@ -2314,7 +2402,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .armholeDepth,
@@ -2332,7 +2420,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .backNeckWidthGuide,
@@ -2350,7 +2438,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .backNeckRiseGuide,
@@ -2368,7 +2456,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .backShoulder,
@@ -2386,7 +2474,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .frontCenterNeckExtension,
@@ -2404,7 +2492,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .frontCenterBodyEdge,
@@ -2421,7 +2509,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .frontNeckWidthGuide,
@@ -2439,7 +2527,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .frontNeckRiseGuide,
@@ -2457,7 +2545,7 @@ export function createReferenceTankV2Construction(
     })
 
   document =
-    addLine(document, {
+    addReferenceTankV2Line(document, {
       id:
         REFERENCE_TANK_V2_LINE_IDS
           .frontShoulder,
