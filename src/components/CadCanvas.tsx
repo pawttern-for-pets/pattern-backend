@@ -47,6 +47,10 @@ import {
 } from '../cad/display'
 
 import {
+  getGeometryAppearance,
+} from '../cad/geometryAppearance'
+
+import {
   deleteSelection,
 } from '../cad/editing'
 
@@ -3140,6 +3144,12 @@ export function CadCanvas({
             selection.id ===
               line.id
 
+          const appearance =
+            getGeometryAppearance(
+              line.role,
+              isSelected,
+            )
+
           return (
             <line
               key={line.id}
@@ -3147,15 +3157,10 @@ export function CadCanvas({
               y1={start.yPx}
               x2={end.xPx}
               y2={end.yPx}
-              stroke={
-                isSelected
-                  ? '#2563eb'
-                  : 'black'
-              }
-              strokeWidth={
-                isSelected
-                  ? 4
-                  : 2
+              stroke={appearance.stroke}
+              strokeWidth={appearance.strokeWidth}
+              strokeDasharray={
+                appearance.strokeDasharray
               }
             />
           )
@@ -3213,6 +3218,12 @@ export function CadCanvas({
             selection.id ===
               curve.id
 
+          const appearance =
+            getGeometryAppearance(
+              curve.role,
+              isSelected,
+            )
+
           const path =
             `M ${start.xPx} ${start.yPx} ` +
             `C ${control1.xPx} ${control1.yPx}, ` +
@@ -3224,15 +3235,10 @@ export function CadCanvas({
               key={curve.id}
               d={path}
               fill="none"
-              stroke={
-                isSelected
-                  ? '#2563eb'
-                  : '#111111'
-              }
-              strokeWidth={
-                isSelected
-                  ? 4
-                  : 2
+              stroke={appearance.stroke}
+              strokeWidth={appearance.strokeWidth}
+              strokeDasharray={
+                appearance.strokeDasharray
               }
             />
           )
