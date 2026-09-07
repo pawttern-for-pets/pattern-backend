@@ -20,6 +20,10 @@ import {
   isValidCubicBezierCurve,
 } from './curves'
 
+import {
+  isGeometryRole,
+} from './geometryRole'
+
 function isRecord(
   value: unknown,
 ): value is Record<string, unknown> {
@@ -136,6 +140,16 @@ function isValidLineMap(
       return false
     }
 
+    const role =
+      rawLine.role
+
+    if (
+      role !== undefined &&
+      !isGeometryRole(role)
+    ) {
+      return false
+    }
+
     const line: Line = {
       id:
         rawLine.id,
@@ -148,6 +162,8 @@ function isValidLineMap(
 
       endPointId:
         rawLine.endPointId,
+
+      role,
     }
 
     if (
@@ -223,6 +239,16 @@ function isValidCurveMap(
       !isFiniteNumber(
         rawCurve.control2.yMm,
       )
+    ) {
+      return false
+    }
+
+    const role =
+      rawCurve.role
+
+    if (
+      role !== undefined &&
+      !isGeometryRole(role)
     ) {
       return false
     }

@@ -106,4 +106,29 @@ describe('PAWTTERN CAD referenced lines', () => {
 
     expect(isValidLine(line, points)).toBe(false)
   })
+
+  it('validates optional geometry roles', () => {
+    const points: PointMap = {
+      A: { id: 'A', name: 'A', xMm: 0, yMm: 0 },
+      B: { id: 'B', name: 'B', xMm: 100, yMm: 0 },
+    }
+
+    const legacyLine: Line = {
+      id: 'AB',
+      name: 'AB',
+      startPointId: 'A',
+      endPointId: 'B',
+    }
+
+    expect(isValidLine(legacyLine, points)).toBe(true)
+    expect(isValidLine({ ...legacyLine, role: 'boundary' }, points)).toBe(true)
+    expect(isValidLine({ ...legacyLine, role: 'construction' }, points)).toBe(true)
+
+    const invalidLine = {
+      ...legacyLine,
+      role: 'banana',
+    } as unknown as Line
+
+    expect(isValidLine(invalidLine, points)).toBe(false)
+  })
 })

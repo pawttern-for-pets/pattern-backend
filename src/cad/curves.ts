@@ -7,6 +7,11 @@ import type {
 } from './lines'
 
 import {
+  isGeometryRole,
+  type GeometryRole,
+} from './geometryRole'
+
+import {
   approximateCubicBezierLengthMm,
   type CubicBezierGeometry,
 } from './bezier'
@@ -20,6 +25,8 @@ export interface CubicBezierCurve {
 
   control1: WorldPosition
   control2: WorldPosition
+
+  role?: GeometryRole
 }
 
 export type CurveMap =
@@ -45,6 +52,15 @@ export function isValidCubicBezierCurve(
   if (
     curve.id.trim().length === 0 ||
     curve.name.trim().length === 0
+  ) {
+    return false
+  }
+
+  if (
+    curve.role !== undefined &&
+    !isGeometryRole(
+      curve.role,
+    )
   ) {
     return false
   }

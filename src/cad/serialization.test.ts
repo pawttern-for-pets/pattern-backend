@@ -383,5 +383,99 @@ describe(
         ).toBe(false)
       },
     )
+
+    it(
+      'round-trips valid geometry roles',
+      () => {
+        const original =
+          createFullDocument()
+
+        const withRoles: PatternDocument = {
+          ...original,
+
+          lines: {
+            ...original.lines,
+
+            L1: {
+              ...original.lines.L1,
+              role: 'boundary',
+            },
+          },
+
+          curves: {
+            ...original.curves,
+
+            C1: {
+              ...original.curves.C1,
+              role: 'construction',
+            },
+          },
+        }
+
+        const restored =
+          deserializePatternDocument(
+            serializePatternDocument(
+              withRoles,
+            ),
+          )
+
+        expect(restored.lines.L1.role).toBe('boundary')
+        expect(restored.curves.C1.role).toBe('construction')
+      },
+    )
+
+    it(
+      'rejects an invalid line geometry role',
+      () => {
+        const document =
+          createFullDocument()
+
+        const corrupted = {
+          ...document,
+
+          lines: {
+            ...document.lines,
+
+            L1: {
+              ...document.lines.L1,
+              role: 'banana',
+            },
+          },
+        }
+
+        expect(
+          isValidPatternDocument(
+            corrupted,
+          ),
+        ).toBe(false)
+      },
+    )
+
+    it(
+      'rejects an invalid curve geometry role',
+      () => {
+        const document =
+          createFullDocument()
+
+        const corrupted = {
+          ...document,
+
+          curves: {
+            ...document.curves,
+
+            C1: {
+              ...document.curves.C1,
+              role: 'banana',
+            },
+          },
+        }
+
+        expect(
+          isValidPatternDocument(
+            corrupted,
+          ),
+        ).toBe(false)
+      },
+    )
   },
 )

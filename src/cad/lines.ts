@@ -1,16 +1,20 @@
 import { distanceMm, isValidPoint, type Point } from './geometry'
+import { isGeometryRole, type GeometryRole } from './geometryRole'
 
 export interface Line {
   id: string
   name: string
   startPointId: string
   endPointId: string
+  role?: GeometryRole
 }
 
 export type PointMap = Record<string, Point>
 
 export function isValidLine(line: Line, points: PointMap): boolean {
   if (line.id.trim().length === 0) return false
+
+  if (line.role !== undefined && !isGeometryRole(line.role)) return false
 
   if (line.startPointId === line.endPointId) return false
 
