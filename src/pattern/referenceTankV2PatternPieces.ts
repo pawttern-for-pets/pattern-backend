@@ -96,6 +96,7 @@ PatternPiece {
           REFERENCE_TANK_V2_LINE_IDS
             .backCenterLength,
         direction: 'reverse',
+        treatment: 'fold',
       },
     ],
   }
@@ -164,6 +165,7 @@ PatternPiece {
           REFERENCE_TANK_V2_LINE_IDS
             .frontCenterBodyEdge,
         direction: 'reverse',
+        treatment: 'fold',
       },
 
       {
@@ -172,6 +174,7 @@ PatternPiece {
           REFERENCE_TANK_V2_LINE_IDS
             .frontCenterNeckExtension,
         direction: 'reverse',
+        treatment: 'fold',
       },
     ],
   }

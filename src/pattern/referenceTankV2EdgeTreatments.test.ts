@@ -43,22 +43,30 @@ function createPieces(
   )
 }
 
+function allEdges(
+  bellyVariant: 'female' | 'male',
+) {
+  const pieces =
+    createPieces(
+      bellyVariant,
+    )
+
+  return [
+    ...pieces.back.edges,
+    ...pieces.frontBelly.edges,
+  ]
+}
+
 describe(
   'PAWTTERN Master Block V2 edge treatments',
   () => {
     it(
       'marks exactly the four confirmed sewn edges as seams',
       () => {
-        const pieces =
-          createPieces(
-            'female',
-          )
-
         const seamEdges =
-          [
-            ...pieces.back.edges,
-            ...pieces.frontBelly.edges,
-          ].filter(
+          allEdges(
+            'female',
+          ).filter(
             (edge) =>
               edge.treatment ===
               'seam',
@@ -92,18 +100,48 @@ describe(
     )
 
     it(
-      'leaves every other perimeter edge intentionally unclassified',
+      'marks exactly the approved center lines as fold edges',
       () => {
-        const pieces =
-          createPieces(
+        const foldEdges =
+          allEdges(
             'female',
+          ).filter(
+            (edge) =>
+              edge.treatment ===
+              'fold',
           )
 
-        const unclassified =
+        expect(
+          foldEdges,
+        ).toHaveLength(3)
+
+        expect(
+          foldEdges.map(
+            (edge) =>
+              edge.geometryId,
+          ).sort(),
+        ).toEqual(
           [
-            ...pieces.back.edges,
-            ...pieces.frontBelly.edges,
-          ].filter(
+            REFERENCE_TANK_V2_LINE_IDS
+              .backCenterLength,
+
+            REFERENCE_TANK_V2_LINE_IDS
+              .frontCenterBodyEdge,
+
+            REFERENCE_TANK_V2_LINE_IDS
+              .frontCenterNeckExtension,
+          ].sort(),
+        )
+      },
+    )
+
+    it(
+      'leaves the remaining ten perimeter edges intentionally unclassified',
+      () => {
+        const unclassified =
+          allEdges(
+            'female',
+          ).filter(
             (edge) =>
               edge.treatment ===
               undefined,
@@ -111,27 +149,36 @@ describe(
 
         expect(
           unclassified,
-        ).toHaveLength(13)
+        ).toHaveLength(10)
       },
     )
 
     it(
-      'uses the same four seam treatments for male construction',
+      'uses the same seam and fold treatments for male construction',
       () => {
-        const pieces =
-          createPieces(
+        const edges =
+          allEdges(
             'male',
           )
 
         const seamGeometryIds =
-          [
-            ...pieces.back.edges,
-            ...pieces.frontBelly.edges,
-          ]
+          edges
             .filter(
               (edge) =>
                 edge.treatment ===
                 'seam',
+            )
+            .map(
+              (edge) =>
+                edge.geometryId,
+            )
+
+        const foldGeometryIds =
+          edges
+            .filter(
+              (edge) =>
+                edge.treatment ===
+                'fold',
             )
             .map(
               (edge) =>
@@ -143,10 +190,20 @@ describe(
         ).toHaveLength(4)
 
         expect(
+          foldGeometryIds,
+        ).toHaveLength(3)
+
+        expect(
           new Set(
             seamGeometryIds,
           ).size,
         ).toBe(4)
+
+        expect(
+          new Set(
+            foldGeometryIds,
+          ).size,
+        ).toBe(3)
       },
     )
   },
