@@ -10,6 +10,11 @@ import {
   isValidCubicBezierCurve,
 } from './curves'
 
+import {
+  isPatternPieceEdgeTreatment,
+  type PatternPieceEdgeTreatment,
+} from './patternPieceEdgeTreatment'
+
 export type PatternPieceEdgeKind =
   'line' |
   'curve'
@@ -21,8 +26,12 @@ export type PatternPieceEdgeDirection =
 export interface PatternPieceEdge {
   kind: PatternPieceEdgeKind
   geometryId: string
+
   direction:
     PatternPieceEdgeDirection
+
+  treatment?:
+    PatternPieceEdgeTreatment
 }
 
 export interface PatternPiece {
@@ -75,6 +84,18 @@ export function resolvePatternPieceEdgeEndpoints(
   ) {
     throw new Error(
       'Pattern piece edge direction is invalid.',
+    )
+  }
+
+  if (
+    edge.treatment !==
+      undefined &&
+    !isPatternPieceEdgeTreatment(
+      edge.treatment,
+    )
+  ) {
+    throw new Error(
+      'Pattern piece edge treatment is invalid.',
     )
   }
 
@@ -184,6 +205,13 @@ export function isValidPatternPiece(
       ) ||
       !isPatternPieceEdgeDirection(
         edge.direction,
+      ) ||
+      (
+        edge.treatment !==
+          undefined &&
+        !isPatternPieceEdgeTreatment(
+          edge.treatment,
+        )
       ) ||
       edge.geometryId.trim().length ===
         0
