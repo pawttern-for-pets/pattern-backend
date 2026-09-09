@@ -38,6 +38,7 @@ PatternPiece {
           REFERENCE_TANK_V2_LINE_IDS
             .backShoulder,
         direction: 'forward',
+        treatment: 'seam',
       },
 
       {
@@ -62,6 +63,7 @@ PatternPiece {
           REFERENCE_TANK_V2_LINE_IDS
             .backSideSeam,
         direction: 'forward',
+        treatment: 'seam',
       },
 
       {
@@ -120,6 +122,7 @@ PatternPiece {
           REFERENCE_TANK_V2_LINE_IDS
             .frontShoulder,
         direction: 'forward',
+        treatment: 'seam',
       },
 
       {
@@ -144,6 +147,7 @@ PatternPiece {
           REFERENCE_TANK_V2_LINE_IDS
             .frontBellySideSeam,
         direction: 'forward',
+        treatment: 'seam',
       },
 
       {

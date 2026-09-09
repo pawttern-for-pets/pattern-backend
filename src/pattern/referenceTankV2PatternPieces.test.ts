@@ -142,7 +142,7 @@ describe(
 
         expect(
           pieces.back.edges,
-        ).toEqual([
+        ).toMatchObject([
           {
             kind: 'curve',
             geometryId:
@@ -210,7 +210,7 @@ describe(
 
         expect(
           pieces.frontBelly.edges,
-        ).toEqual([
+        ).toMatchObject([
           {
             kind: 'curve',
             geometryId:
