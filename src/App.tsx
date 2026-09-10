@@ -14,6 +14,10 @@ import {
   PatternInputPanel,
 } from './components/PatternInputPanel'
 
+import {
+  PatternPiecesView,
+} from './components/PatternPiecesView'
+
 import type {
   PatternDocument,
 } from './cad/document'
@@ -64,6 +68,10 @@ import {
 import {
   validateReferenceTankV2DocumentEdit,
 } from './pattern/referenceTankV2EditValidation'
+
+import {
+  createReferenceTankV2ProductionLayout,
+} from './pattern/referenceTankV2ProductionLayout'
 
 import {
   isFileSystemAccessSupported,
@@ -198,6 +206,14 @@ function App() {
     setIsPatternSidebarCollapsed,
   ] = useState(false)
 
+  const [
+    workspaceView,
+    setWorkspaceView,
+  ] = useState<
+    'drafting' |
+    'pattern-pieces'
+  >('drafting')
+
   const fileAccessSupported =
     useMemo(
       () =>
@@ -213,6 +229,45 @@ function App() {
 
   const patternDocument =
     patternProject.document
+
+  const productionLayout =
+    useMemo(
+      () => {
+        if (
+          patternProject.draftingRuleVersion !==
+            PAWTTERN_MASTER_V2_RULE_VERSION ||
+          patternProject.measurements ===
+            null
+        ) {
+          return null
+        }
+
+        try {
+          return createReferenceTankV2ProductionLayout(
+            patternDocument,
+          )
+        } catch {
+          return null
+        }
+      },
+      [
+        patternDocument,
+        patternProject.draftingRuleVersion,
+        patternProject.measurements,
+      ],
+    )
+
+  useEffect(() => {
+    if (
+      workspaceView === 'pattern-pieces' &&
+      productionLayout === null
+    ) {
+      setWorkspaceView('drafting')
+    }
+  }, [
+    workspaceView,
+    productionLayout,
+  ])
 
   const readOnlyCurveIds =
     patternProject.draftingRuleVersion ===
@@ -938,39 +993,129 @@ function App() {
         </aside>
 
         <main className="workspace">
-          <CadCanvas
-            key={
-              project.sessionId
-            }
-            document={
-              patternDocument
-            }
-            unit={
-              displayUnit
-            }
-            onDocumentChange={
-              handleDocumentChange
-            }
-            canUndo={
-              canUndo(
-                patternHistory,
-              )
-            }
-            canRedo={
-              canRedo(
-                patternHistory,
-              )
-            }
-            onUndo={
-              handleUndo
-            }
-            onRedo={
-              handleRedo
-            }
-            readOnlyCurveIds={
-              readOnlyCurveIds
-            }
-          />
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              width: '100%',
+              height: '100%',
+              minHeight: 0,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: 8,
+                flex: '0 0 auto',
+                borderBottom: '1px solid #d4d4d4',
+                background: '#ffffff',
+              }}
+            >
+              <strong>
+                View:
+              </strong>
+
+              <button
+                type="button"
+                aria-pressed={
+                  workspaceView === 'drafting'
+                }
+                onClick={() =>
+                  setWorkspaceView(
+                    'drafting',
+                  )
+                }
+              >
+                Drafting
+              </button>
+
+              <button
+                type="button"
+                aria-pressed={
+                  workspaceView === 'pattern-pieces'
+                }
+                disabled={
+                  productionLayout === null
+                }
+                onClick={() =>
+                  setWorkspaceView(
+                    'pattern-pieces',
+                  )
+                }
+                title={
+                  productionLayout === null
+                    ? 'Generate the V2 Master Block first.'
+                    : 'Show separated read-only pattern pieces.'
+                }
+              >
+                Pattern Pieces
+              </button>
+
+              {workspaceView ===
+                'pattern-pieces' && (
+                <span
+                  style={{
+                    marginLeft: 8,
+                    fontSize: '0.85rem',
+                    opacity: 0.7,
+                  }}
+                >
+                  Read-only production view
+                </span>
+              )}
+            </div>
+
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                width: '100%',
+              }}
+            >
+              {workspaceView === 'pattern-pieces' &&
+              productionLayout !== null ? (
+                <PatternPiecesView
+                  layout={productionLayout}
+                />
+              ) : (
+                <CadCanvas
+                            key={
+                              project.sessionId
+                            }
+                            document={
+                              patternDocument
+                            }
+                            unit={
+                              displayUnit
+                            }
+                            onDocumentChange={
+                              handleDocumentChange
+                            }
+                            canUndo={
+                              canUndo(
+                                patternHistory,
+                              )
+                            }
+                            canRedo={
+                              canRedo(
+                                patternHistory,
+                              )
+                            }
+                            onUndo={
+                              handleUndo
+                            }
+                            onRedo={
+                              handleRedo
+                            }
+                            readOnlyCurveIds={
+                              readOnlyCurveIds
+                            }
+                          />
+              )}
+            </div>
+          </div>
         </main>
       </div>
     </div>
