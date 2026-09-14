@@ -72,6 +72,9 @@ import {
 import {
   createReferenceTankV2ProductionLayout,
 } from './pattern/referenceTankV2ProductionLayout'
+import {
+  createReferenceTankV2ProductionCuttingContours,
+} from './pattern/referenceTankV2ProductionCuttingContours'
 
 import {
   isFileSystemAccessSupported,
@@ -257,16 +260,42 @@ function App() {
       ],
     )
 
+  const productionCuttingContours =
+    useMemo(
+      () => {
+        if (
+          productionLayout === null
+        ) {
+          return null
+        }
+
+        try {
+          return createReferenceTankV2ProductionCuttingContours(
+            productionLayout,
+          )
+        } catch {
+          return null
+        }
+      },
+      [
+        productionLayout,
+      ],
+    )
+
   useEffect(() => {
     if (
       workspaceView === 'pattern-pieces' &&
-      productionLayout === null
+      (
+        productionLayout === null ||
+        productionCuttingContours === null
+      )
     ) {
       setWorkspaceView('drafting')
     }
   }, [
     workspaceView,
     productionLayout,
+    productionCuttingContours,
   ])
 
   const readOnlyCurveIds =
@@ -1037,7 +1066,7 @@ function App() {
                   workspaceView === 'pattern-pieces'
                 }
                 disabled={
-                  productionLayout === null
+                  productionCuttingContours === null
                 }
                 onClick={() =>
                   setWorkspaceView(
@@ -1045,8 +1074,8 @@ function App() {
                   )
                 }
                 title={
-                  productionLayout === null
-                    ? 'Generate the V2 Master Block first.'
+                  productionCuttingContours === null
+                    ? 'Generate a valid V2 production pattern first.'
                     : 'Show separated read-only pattern pieces.'
                 }
               >
@@ -1075,9 +1104,13 @@ function App() {
               }}
             >
               {workspaceView === 'pattern-pieces' &&
-              productionLayout !== null ? (
+              productionLayout !== null &&
+              productionCuttingContours !== null ? (
                 <PatternPiecesView
                   layout={productionLayout}
+                  cuttingContours={
+                    productionCuttingContours
+                  }
                 />
               ) : (
                 <CadCanvas

@@ -1,4 +1,8 @@
 import type {
+  WorldPosition,
+} from '../cad/coordinates'
+
+import type {
   PatternDocument,
 } from '../cad/document'
 
@@ -8,6 +12,10 @@ import type {
 } from '../cad/patternPiece'
 
 import type {
+  ReferenceTankV2ProductionCuttingContours,
+} from '../pattern/referenceTankV2ProductionCuttingContours'
+
+import type {
   PatternPieceControlBounds,
   ReferenceTankV2ProductionLayout,
 } from '../pattern/referenceTankV2ProductionLayout'
@@ -15,9 +23,106 @@ import type {
 interface PatternPiecesViewProps {
   layout:
     ReferenceTankV2ProductionLayout
+
+  cuttingContours?:
+    ReferenceTankV2ProductionCuttingContours |
+    null
 }
 
-const VIEW_PADDING_MM = 20
+const VIEW_PADDING_MM =
+  20
+
+function copyBounds(
+  bounds:
+    PatternPieceControlBounds,
+): PatternPieceControlBounds {
+  return {
+    minXMm:
+      bounds.minXMm,
+
+    maxXMm:
+      bounds.maxXMm,
+
+    minYMm:
+      bounds.minYMm,
+
+    maxYMm:
+      bounds.maxYMm,
+  }
+}
+
+function includePoint(
+  bounds:
+    PatternPieceControlBounds,
+
+  point:
+    WorldPosition,
+): void {
+  bounds.minXMm =
+    Math.min(
+      bounds.minXMm,
+      point.xMm,
+    )
+
+  bounds.maxXMm =
+    Math.max(
+      bounds.maxXMm,
+      point.xMm,
+    )
+
+  bounds.minYMm =
+    Math.min(
+      bounds.minYMm,
+      point.yMm,
+    )
+
+  bounds.maxYMm =
+    Math.max(
+      bounds.maxYMm,
+      point.yMm,
+    )
+}
+
+function includePoints(
+  bounds:
+    PatternPieceControlBounds,
+
+  points:
+    readonly WorldPosition[],
+): void {
+  for (
+    const point of points
+  ) {
+    includePoint(
+      bounds,
+      point,
+    )
+  }
+}
+
+function getPieceViewBounds(
+  sewingBounds:
+    PatternPieceControlBounds,
+
+  cuttingPoints?:
+    readonly WorldPosition[],
+): PatternPieceControlBounds {
+  const bounds =
+    copyBounds(
+      sewingBounds,
+    )
+
+  if (
+    cuttingPoints
+  ) {
+    includePoints(
+      bounds,
+      cuttingPoints,
+    )
+  }
+
+  return bounds
+}
 
 function getCombinedBounds(
   back:
@@ -53,7 +158,7 @@ function getCombinedBounds(
   }
 }
 
-function renderEdge(
+function renderSewingEdge(
   document:
     PatternDocument,
 
@@ -96,13 +201,15 @@ function renderEdge(
     return (
       <line
         key={key}
+        data-line-type="sewing"
         x1={start.xMm}
         y1={start.yMm}
         x2={end.xMm}
         y2={end.yMm}
         fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
+        stroke="#666666"
+        strokeWidth={1.5}
+        strokeDasharray="5 4"
         vectorEffect="non-scaling-stroke"
       />
     )
@@ -145,16 +252,18 @@ function renderEdge(
   return (
     <path
       key={key}
+      data-line-type="sewing"
       d={path}
       fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
+      stroke="#666666"
+      strokeWidth={1.5}
+      strokeDasharray="5 4"
       vectorEffect="non-scaling-stroke"
     />
   )
 }
 
-function renderPiece(
+function renderSewingPiece(
   document:
     PatternDocument,
 
@@ -166,11 +275,56 @@ function renderPiece(
       edge,
       index,
     ) =>
-      renderEdge(
+      renderSewingEdge(
         document,
         edge,
-        `${piece.id}:${index}`,
+        `${piece.id}:sewing:${index}`,
       ),
+  )
+}
+
+function cuttingPolylinePoints(
+  points:
+    readonly WorldPosition[],
+): string {
+  return points
+    .map(
+      (point) =>
+        `${point.xMm},${point.yMm}`,
+    )
+    .join(' ')
+}
+
+function renderCuttingContour(
+  points:
+    readonly WorldPosition[] |
+    undefined,
+
+  key:
+    string,
+) {
+  if (
+    !points ||
+    points.length < 4
+  ) {
+    return null
+  }
+
+  return (
+    <polyline
+      key={key}
+      data-line-type="cutting"
+      points={
+        cuttingPolylinePoints(
+          points,
+        )
+      }
+      fill="none"
+      stroke="#111111"
+      strokeWidth={2.5}
+      strokeLinejoin="round"
+      vectorEffect="non-scaling-stroke"
+    />
   )
 }
 
@@ -192,11 +346,27 @@ function getLabelPosition(
 
 export function PatternPiecesView({
   layout,
+  cuttingContours = null,
 }: PatternPiecesViewProps) {
+  const backViewBounds =
+    getPieceViewBounds(
+      layout.backBounds,
+      cuttingContours?.back
+        .cuttingPoints,
+    )
+
+  const frontViewBounds =
+    getPieceViewBounds(
+      layout.frontBellyBounds,
+      cuttingContours
+        ?.frontBelly
+        .cuttingPoints,
+    )
+
   const combinedBounds =
     getCombinedBounds(
-      layout.backBounds,
-      layout.frontBellyBounds,
+      backViewBounds,
+      frontViewBounds,
     )
 
   const minXMm =
@@ -223,12 +393,12 @@ export function PatternPiecesView({
 
   const backLabel =
     getLabelPosition(
-      layout.backBounds,
+      backViewBounds,
     )
 
   const frontLabel =
     getLabelPosition(
-      layout.frontBellyBounds,
+      frontViewBounds,
     )
 
   return (
@@ -260,9 +430,15 @@ export function PatternPiecesView({
         <g
           data-pattern-piece="back"
         >
-          {renderPiece(
+          {renderSewingPiece(
             layout.document,
             layout.back,
+          )}
+
+          {renderCuttingContour(
+            cuttingContours?.back
+              .cuttingPoints,
+            'back:cutting',
           )}
 
           <text
@@ -280,9 +456,16 @@ export function PatternPiecesView({
         <g
           data-pattern-piece="front-belly"
         >
-          {renderPiece(
+          {renderSewingPiece(
             layout.document,
             layout.frontBelly,
+          )}
+
+          {renderCuttingContour(
+            cuttingContours
+              ?.frontBelly
+              .cuttingPoints,
+            'front-belly:cutting',
           )}
 
           <text
