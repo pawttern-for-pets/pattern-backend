@@ -11,6 +11,11 @@ import {
   type PatternPieceFoldMarking,
 } from '../cad/patternPieceFoldMarking'
 
+import {
+  createFoldParallelPatternPieceGrainline,
+  type PatternPieceGrainline,
+} from '../cad/patternPieceGrainline'
+
 import type {
   PatternPiece,
   PatternPieceEdge,
@@ -42,6 +47,12 @@ const FOLD_LABEL_OFFSET_MM =
 
 const FOLD_LEADER_LENGTH_MM =
   5
+
+const GRAINLINE_ARROW_LENGTH_MM =
+  4
+
+const GRAINLINE_ARROW_HALF_WIDTH_MM =
+  2
 
 function copyBounds(
   bounds:
@@ -549,6 +560,155 @@ function renderFoldMarkings(
   )
 }
 
+function renderGrainline(
+  grainline:
+    PatternPieceGrainline,
+
+  key:
+    string,
+) {
+  const perpendicular = {
+    x:
+      -grainline.direction.y,
+
+    y:
+      grainline.direction.x,
+  }
+
+  const startBase = {
+    xMm:
+      grainline.start.xMm +
+      grainline.direction.x *
+        GRAINLINE_ARROW_LENGTH_MM,
+
+    yMm:
+      grainline.start.yMm +
+      grainline.direction.y *
+        GRAINLINE_ARROW_LENGTH_MM,
+  }
+
+  const endBase = {
+    xMm:
+      grainline.end.xMm -
+      grainline.direction.x *
+        GRAINLINE_ARROW_LENGTH_MM,
+
+    yMm:
+      grainline.end.yMm -
+      grainline.direction.y *
+        GRAINLINE_ARROW_LENGTH_MM,
+  }
+
+  const startWingA = {
+    xMm:
+      startBase.xMm +
+      perpendicular.x *
+        GRAINLINE_ARROW_HALF_WIDTH_MM,
+
+    yMm:
+      startBase.yMm +
+      perpendicular.y *
+        GRAINLINE_ARROW_HALF_WIDTH_MM,
+  }
+
+  const startWingB = {
+    xMm:
+      startBase.xMm -
+      perpendicular.x *
+        GRAINLINE_ARROW_HALF_WIDTH_MM,
+
+    yMm:
+      startBase.yMm -
+      perpendicular.y *
+        GRAINLINE_ARROW_HALF_WIDTH_MM,
+  }
+
+  const endWingA = {
+    xMm:
+      endBase.xMm +
+      perpendicular.x *
+        GRAINLINE_ARROW_HALF_WIDTH_MM,
+
+    yMm:
+      endBase.yMm +
+      perpendicular.y *
+        GRAINLINE_ARROW_HALF_WIDTH_MM,
+  }
+
+  const endWingB = {
+    xMm:
+      endBase.xMm -
+      perpendicular.x *
+        GRAINLINE_ARROW_HALF_WIDTH_MM,
+
+    yMm:
+      endBase.yMm -
+      perpendicular.y *
+        GRAINLINE_ARROW_HALF_WIDTH_MM,
+  }
+
+  return (
+    <g
+      key={key}
+      data-marking-type="grainline"
+    >
+      <line
+        x1={grainline.start.xMm}
+        y1={grainline.start.yMm}
+        x2={grainline.end.xMm}
+        y2={grainline.end.yMm}
+        stroke="#111111"
+        strokeWidth={1.25}
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <line
+        x1={grainline.start.xMm}
+        y1={grainline.start.yMm}
+        x2={startWingA.xMm}
+        y2={startWingA.yMm}
+        stroke="#111111"
+        strokeWidth={1.25}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <line
+        x1={grainline.start.xMm}
+        y1={grainline.start.yMm}
+        x2={startWingB.xMm}
+        y2={startWingB.yMm}
+        stroke="#111111"
+        strokeWidth={1.25}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <line
+        x1={grainline.end.xMm}
+        y1={grainline.end.yMm}
+        x2={endWingA.xMm}
+        y2={endWingA.yMm}
+        stroke="#111111"
+        strokeWidth={1.25}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <line
+        x1={grainline.end.xMm}
+        y1={grainline.end.yMm}
+        x2={endWingB.xMm}
+        y2={endWingB.yMm}
+        stroke="#111111"
+        strokeWidth={1.25}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </g>
+  )
+}
+
 export function PatternPiecesView({
   layout,
   cuttingContours = null,
@@ -618,6 +778,18 @@ export function PatternPiecesView({
       layout.frontBelly,
     )
 
+  const backGrainline =
+    createFoldParallelPatternPieceGrainline(
+      layout.document,
+      layout.back,
+    )
+
+  const frontGrainline =
+    createFoldParallelPatternPieceGrainline(
+      layout.document,
+      layout.frontBelly,
+    )
+
   return (
     <div
       style={{
@@ -664,6 +836,11 @@ export function PatternPiecesView({
             'back',
           )}
 
+          {renderGrainline(
+            backGrainline,
+            'back:grainline',
+          )}
+
           <text
             x={backLabel.xMm}
             y={backLabel.yMm}
@@ -695,6 +872,11 @@ export function PatternPiecesView({
             frontFoldMarkings,
             layout.frontBellyBounds,
             'front-belly',
+          )}
+
+          {renderGrainline(
+            frontGrainline,
+            'front-belly:grainline',
           )}
 
           <text
