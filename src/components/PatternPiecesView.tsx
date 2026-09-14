@@ -6,6 +6,11 @@ import type {
   PatternDocument,
 } from '../cad/document'
 
+import {
+  createPatternPieceFoldMarkings,
+  type PatternPieceFoldMarking,
+} from '../cad/patternPieceFoldMarking'
+
 import type {
   PatternPiece,
   PatternPieceEdge,
@@ -31,6 +36,12 @@ interface PatternPiecesViewProps {
 
 const VIEW_PADDING_MM =
   20
+
+const FOLD_LABEL_OFFSET_MM =
+  12
+
+const FOLD_LEADER_LENGTH_MM =
+  5
 
 function copyBounds(
   bounds:
@@ -344,6 +355,200 @@ function getLabelPosition(
   }
 }
 
+function getReadableAngleDegrees(
+  direction: {
+    x: number
+    y: number
+  },
+): number {
+  let angle =
+    Math.atan2(
+      direction.y,
+      direction.x,
+    ) *
+    180 /
+    Math.PI
+
+  if (
+    angle > 90
+  ) {
+    angle -= 180
+  } else if (
+    angle < -90
+  ) {
+    angle += 180
+  }
+
+  return angle
+}
+
+function getFoldAnnotationGeometry(
+  marking:
+    PatternPieceFoldMarking,
+
+  bounds:
+    PatternPieceControlBounds,
+) {
+  const pieceCenter = {
+    xMm:
+      (
+        bounds.minXMm +
+        bounds.maxXMm
+      ) / 2,
+
+    yMm:
+      (
+        bounds.minYMm +
+        bounds.maxYMm
+      ) / 2,
+  }
+
+  const perpendicular = {
+    x:
+      -marking.direction.y,
+
+    y:
+      marking.direction.x,
+  }
+
+  const towardCenter = {
+    x:
+      pieceCenter.xMm -
+      marking.midpoint.xMm,
+
+    y:
+      pieceCenter.yMm -
+      marking.midpoint.yMm,
+  }
+
+  const dot =
+    perpendicular.x *
+      towardCenter.x +
+    perpendicular.y *
+      towardCenter.y
+
+  const inward =
+    dot >= 0
+      ? perpendicular
+      : {
+          x:
+            -perpendicular.x,
+
+          y:
+            -perpendicular.y,
+        }
+
+  return {
+    label: {
+      xMm:
+        marking.midpoint.xMm +
+        inward.x *
+          FOLD_LABEL_OFFSET_MM,
+
+      yMm:
+        marking.midpoint.yMm +
+        inward.y *
+          FOLD_LABEL_OFFSET_MM,
+    },
+
+    leaderEnd: {
+      xMm:
+        marking.midpoint.xMm +
+        inward.x *
+          FOLD_LEADER_LENGTH_MM,
+
+      yMm:
+        marking.midpoint.yMm +
+        inward.y *
+          FOLD_LEADER_LENGTH_MM,
+    },
+
+    angleDegrees:
+      getReadableAngleDegrees(
+        marking.direction,
+      ),
+  }
+}
+
+function renderFoldMarkings(
+  markings:
+    readonly PatternPieceFoldMarking[],
+
+  bounds:
+    PatternPieceControlBounds,
+
+  keyPrefix:
+    string,
+) {
+  return markings.map(
+    (
+      marking,
+      index,
+    ) => {
+      const annotation =
+        getFoldAnnotationGeometry(
+          marking,
+          bounds,
+        )
+
+      return (
+        <g
+          key={
+            `${keyPrefix}:fold:${index}`
+          }
+          data-marking-type="cut-on-fold"
+        >
+          <line
+            x1={
+              marking.midpoint.xMm
+            }
+            y1={
+              marking.midpoint.yMm
+            }
+            x2={
+              annotation
+                .leaderEnd.xMm
+            }
+            y2={
+              annotation
+                .leaderEnd.yMm
+            }
+            stroke="#111111"
+            strokeWidth={1.25}
+            vectorEffect="non-scaling-stroke"
+          />
+
+          <text
+            x={
+              annotation
+                .label.xMm
+            }
+            y={
+              annotation
+                .label.yMm
+            }
+            transform={
+              `rotate(${annotation.angleDegrees} ${annotation.label.xMm} ${annotation.label.yMm})`
+            }
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize={7}
+            fontWeight={600}
+            letterSpacing={0.5}
+            fill="#111111"
+            stroke="#ffffff"
+            strokeWidth={2.5}
+            strokeLinejoin="round"
+            paintOrder="stroke"
+          >
+            CUT ON FOLD
+          </text>
+        </g>
+      )
+    },
+  )
+}
+
 export function PatternPiecesView({
   layout,
   cuttingContours = null,
@@ -401,6 +606,18 @@ export function PatternPiecesView({
       frontViewBounds,
     )
 
+  const backFoldMarkings =
+    createPatternPieceFoldMarkings(
+      layout.document,
+      layout.back,
+    )
+
+  const frontFoldMarkings =
+    createPatternPieceFoldMarkings(
+      layout.document,
+      layout.frontBelly,
+    )
+
   return (
     <div
       style={{
@@ -441,6 +658,12 @@ export function PatternPiecesView({
             'back:cutting',
           )}
 
+          {renderFoldMarkings(
+            backFoldMarkings,
+            layout.backBounds,
+            'back',
+          )}
+
           <text
             x={backLabel.xMm}
             y={backLabel.yMm}
@@ -466,6 +689,12 @@ export function PatternPiecesView({
               ?.frontBelly
               .cuttingPoints,
             'front-belly:cutting',
+          )}
+
+          {renderFoldMarkings(
+            frontFoldMarkings,
+            layout.frontBellyBounds,
+            'front-belly',
           )}
 
           <text
