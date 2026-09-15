@@ -8,13 +8,31 @@ import type {
 
 import {
   createPatternPieceFoldMarkings,
-  type PatternPieceFoldMarking,
+} from '../cad/patternPieceFoldMarking'
+
+import type {
+  PatternPieceFoldMarking,
 } from '../cad/patternPieceFoldMarking'
 
 import {
   createFoldParallelPatternPieceGrainline,
-  type PatternPieceGrainline,
 } from '../cad/patternPieceGrainline'
+
+import type {
+  PatternPieceGrainline,
+} from '../cad/patternPieceGrainline'
+
+import {
+  createPatternPieceIdentification,
+} from '../cad/patternPieceIdentification'
+
+import type {
+  PatternPieceIdentification,
+} from '../cad/patternPieceIdentification'
+
+import {
+  findPatternPieceInteriorPoint,
+} from '../cad/patternPieceInteriorPoint'
 
 import type {
   PatternPiece,
@@ -29,6 +47,10 @@ import type {
   PatternPieceControlBounds,
   ReferenceTankV2ProductionLayout,
 } from '../pattern/referenceTankV2ProductionLayout'
+
+import {
+  createReferenceTankV2ProductionMetadata,
+} from '../pattern/referenceTankV2ProductionMetadata'
 
 interface PatternPiecesViewProps {
   layout:
@@ -709,6 +731,57 @@ function renderGrainline(
   )
 }
 
+function renderPieceIdentification(
+  identification:
+    PatternPieceIdentification,
+
+  anchor:
+    WorldPosition,
+
+  key:
+    string,
+) {
+  return (
+    <g
+      key={key}
+      data-marking-type="piece-identification"
+    >
+      <rect
+        x={anchor.xMm - 28}
+        y={anchor.yMm - 6}
+        width={56}
+        height={20}
+        rx={2}
+        fill="#ffffff"
+      />
+
+      <text
+        x={anchor.xMm}
+        y={anchor.yMm}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={8}
+        fontWeight={700}
+        fill="#111111"
+      >
+        {identification.primaryText}
+      </text>
+
+      <text
+        x={anchor.xMm}
+        y={anchor.yMm + 8}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={6}
+        fontWeight={600}
+        letterSpacing={0.3}
+        fill="#111111"
+      >
+        {identification.secondaryText}
+      </text>
+    </g>
+  )
+}
 export function PatternPiecesView({
   layout,
   cuttingContours = null,
@@ -790,6 +863,35 @@ export function PatternPiecesView({
       layout.frontBelly,
     )
 
+  const productionMetadata =
+    createReferenceTankV2ProductionMetadata(
+      layout,
+    )
+
+  const backIdentification =
+    createPatternPieceIdentification(
+      layout.back,
+      productionMetadata.back,
+    )
+
+  const frontIdentification =
+    createPatternPieceIdentification(
+      layout.frontBelly,
+      productionMetadata.frontBelly,
+    )
+
+  const backIdentificationAnchor =
+    findPatternPieceInteriorPoint(
+      layout.document,
+      layout.back,
+    ).point
+
+  const frontIdentificationAnchor =
+    findPatternPieceInteriorPoint(
+      layout.document,
+      layout.frontBelly,
+    ).point
+
   return (
     <div
       style={{
@@ -841,6 +943,12 @@ export function PatternPiecesView({
             'back:grainline',
           )}
 
+          {renderPieceIdentification(
+            backIdentification,
+            backIdentificationAnchor,
+            'back:identification',
+          )}
+
           <text
             x={backLabel.xMm}
             y={backLabel.yMm}
@@ -849,7 +957,7 @@ export function PatternPiecesView({
             fontWeight={600}
             fill="currentColor"
           >
-            BACK
+            BACK BODICE
           </text>
         </g>
 
@@ -879,6 +987,12 @@ export function PatternPiecesView({
             'front-belly:grainline',
           )}
 
+          {renderPieceIdentification(
+            frontIdentification,
+            frontIdentificationAnchor,
+            'front-belly:identification',
+          )}
+
           <text
             x={frontLabel.xMm}
             y={frontLabel.yMm}
@@ -887,7 +1001,7 @@ export function PatternPiecesView({
             fontWeight={600}
             fill="currentColor"
           >
-            FRONT / BELLY
+            FRONT BODICE
           </text>
         </g>
       </svg>
